@@ -1,4 +1,4 @@
-#include "armor_detector/CameraProvider.hpp"
+#include "armor_detector/camera_provider.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include <opencv2/highgui.hpp>
 
@@ -10,7 +10,6 @@ class DetectorNode : public rclcpp::Node
 private:
     CameraProvider camera_provider_;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
-    int frame_count_ = 0;
 
     void run(const sensor_msgs::msg::Image::SharedPtr & msg);
 

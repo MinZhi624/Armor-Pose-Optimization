@@ -1,7 +1,7 @@
 #pragma once
 
-#include "CameraInfo.hpp"
-#include "Frame.hpp"
+#include "interfaces/camera_info.hpp"
+#include "interfaces/frame.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>

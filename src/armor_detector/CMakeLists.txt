@@ -16,14 +16,14 @@ find_package(cv_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
 add_executable(armor_detector_node
-  src/DetectorNode.cpp
-  src/ArmorDetector.cpp
-  src/Detector.cpp
-  src/CameraProvider.cpp
-  src/PoseSolver.cpp
-  src/LightDetector.cpp
-  src/DebugGui.cpp
-  src/DebugMsg.cpp
+  src/detector_node.cpp
+  src/detector/armor_detector.cpp
+  src/detector/detector.cpp
+  src/camera_provider.cpp
+  src/pose_solver.cpp
+  src/detector/light_detector.cpp
+  src/debug/debug_gui.cpp
+  src/debug/debug_msg.cpp
 )
 
 target_include_directories(armor_detector_node PUBLIC

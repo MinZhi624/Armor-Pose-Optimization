@@ -1,4 +1,4 @@
-#include "armor_detector/CameraProvider.hpp"
+#include "armor_detector/camera_provider.hpp"
 
 #include <opencv2/core.hpp>
 #include <yaml-cpp/yaml.h>
