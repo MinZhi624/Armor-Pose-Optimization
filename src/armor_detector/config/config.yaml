@@ -1,0 +1,48 @@
+armor_detector_node_cpp:
+  ros__parameters:
+    # 目标颜色
+    target_color: "RED"
+
+    # 预处理
+    gray_threshold: 100
+    color_threshold: 100
+
+    # 灯条
+    min_contours_area: 30
+    min_contours_ratio: 0.06
+    max_contours_ratio: 0.5
+
+    # 装甲板匹配
+    max_angle_diff: 15.0
+    min_length_ratio: 0.7
+    min_x_diff_ratio: 0.75
+    max_y_diff_ratio: 1.0
+    max_distance_ratio: 0.8
+    min_distance_ratio: 0.1
+
+    # 数字分类
+    model_path: "model/number_cnn.onnx"
+    number_threshold: 0.5
+
+    # Debug
+    debug:
+      show: true
+      rosbag_control: true
+      rosbag_player_node: "/rosbag2_player"
+      preprocess: false
+      lights: false
+      armor_match: false
+      classification: false
+      pose: true
+      result: true
+      stats_interval: 50
+
+    # Playback
+    # mode: "realtime" - rosbag 按时间正常播放
+    #        "step"    - 处理完一帧后再请求播放下一帧（用于 auto test）
+    # max_frames: 0 表示不限制帧数；>0 时处理指定帧数后退出
+    # exit_on_complete: true 时达到 max_frames 后自动 rclcpp::shutdown()
+    playback:
+      mode: "realtime"
+      max_frames: 0
+      exit_on_complete: false
