@@ -1,161 +1,162 @@
-#include "armor_detector/CameraProvider.hpp"
-#include "armor_detector/detector/Detector.hpp"
-#include "armor_detector/detector/LightDetector.hpp"
-#include "armor_detector/debug/DebugGUI.hpp"
-#include "armor_detector/debug/DebugHub.hpp"
-#include "armor_detector/debug/DebugData.hpp"
-#include "armor_detector/debug/DebugPreprocess.hpp"
+#include "armor_detector/DetectorNode.hpp"
+#include "armor_detector/debug/DebugLayerController.hpp"
 #include "armor_detector/debug/DebugLight.hpp"
-
-#include <rclcpp/rclcpp.hpp>
-#include <rosbag2_interfaces/srv/toggle_paused.hpp>
-#include <rosbag2_interfaces/srv/play_next.hpp>
-#include <rosbag2_interfaces/srv/set_rate.hpp>
+#include "armor_detector/debug/DebugPreprocess.hpp"
+#include "armor_detector/debug/DebugTiming.hpp"
 
 #include <algorithm>
 #include <memory>
-#include <string>
 
 namespace armor_detector
 {
 
-class DetectorNode : public rclcpp::Node
+DetectorNode::DetectorNode()
+    : Node("armor_detector_node_cpp"),
+      detector_(Detector::Params{}),
+      light_detector_(LightDetector::Params{})
 {
-private:
-    CameraProvider camera_provider_;
-    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
+    initParameters();
+    initDetectors();
+    camera_provider_.init();
 
-    // 检测组件
-    Detector detector_;
-    LightDetector light_detector_;
+    image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
+        "/image_raw", rclcpp::QoS(10),
+        [this](const sensor_msgs::msg::Image::SharedPtr msg) { run(msg); });
 
-    // Debug
-    debug::DebugGUI debug_gui_;
-    debug::DebugHub debug_hub_;
-    rclcpp::TimerBase::SharedPtr debug_key_timer_;
-    rclcpp::Client<rosbag2_interfaces::srv::TogglePaused>::SharedPtr toggle_paused_client_;
-    rclcpp::Client<rosbag2_interfaces::srv::PlayNext>::SharedPtr play_next_client_;
-    rclcpp::Client<rosbag2_interfaces::srv::SetRate>::SharedPtr set_rate_client_;
-    std::string debug_gui_window_name_;
-    double playback_rate_ = 1.0;
-    std::size_t frame_index_ = 0;
+    initDebug();
+    initRosbagClients();
 
-    void run(const sensor_msgs::msg::Image::SharedPtr & msg);
-    void pollDebugKeys();
+    RCLCPP_INFO(this->get_logger(), "armor_detector节点已启动.");
+}
 
-public:
-    DetectorNode() : Node("armor_detector_node_cpp"),
-                     detector_([] {
-                         // 临时默认参数，构造函数体中会被 ROS 参数覆盖
-                         Detector::Params p;
-                         return p;
-                     }()),
-                     light_detector_([] {
-                         LightDetector::Params p;
-                         return p;
-                     }())
-    {
-        // 声明参数
-        this->declare_parameter<bool>("debug_gui_enabled", true);
-        this->declare_parameter<bool>("debug_rosbag_control_enabled", true);
-        this->declare_parameter<std::string>("debug_rosbag_player_node", "/rosbag2_player");
-        this->declare_parameter<std::string>("debug_gui_window_name", "debug_show");
+DetectorNode::~DetectorNode()
+{
+    debug_gui_.stop();
+}
 
-        // 预处理参数
-        this->declare_parameter<int>("gray_threshold", 100);
-        this->declare_parameter<int>("color_threshold", 100);
-        this->declare_parameter<std::string>("target_color", "BLUE");
+// ===================== init 方法 =====================
 
-        // 灯条参数
-        this->declare_parameter<int>("min_contours_area", 30);
-        this->declare_parameter<double>("min_contours_ratio", 0.06);
-        this->declare_parameter<double>("max_contours_ratio", 0.5);
+void DetectorNode::initParameters()
+{
+    // Debug 配置
+    debug_config_.show = this->declare_parameter<bool>("debug.show", true);
+    debug_config_.rosbag_control = this->declare_parameter<bool>("debug.rosbag_control", true);
+    debug_config_.rosbag_player_node =
+        this->declare_parameter<std::string>("debug.rosbag_player_node", "/rosbag2_player");
+    debug_config_.preprocess = this->declare_parameter<bool>("debug.preprocess", false);
+    debug_config_.lights = this->declare_parameter<bool>("debug.lights", true);
+    debug_config_.armor_match = this->declare_parameter<bool>("debug.armor_match", false);
+    debug_config_.classification = this->declare_parameter<bool>("debug.classification", false);
+    debug_config_.pose = this->declare_parameter<bool>("debug.pose", false);
+    debug_config_.stats_interval =
+        static_cast<std::size_t>(this->declare_parameter<int>("debug.stats_interval", 50));
+}
 
-        // 读取参数
-        bool debug_gui_enabled = this->get_parameter("debug_gui_enabled").as_bool();
-        bool rosbag_control_enabled = this->get_parameter("debug_rosbag_control_enabled").as_bool();
-        std::string rosbag_player_node = this->get_parameter("debug_rosbag_player_node").as_string();
-        debug_gui_window_name_ = this->get_parameter("debug_gui_window_name").as_string();
+void DetectorNode::initDetectors()
+{
+    std::string target_color_str = this->declare_parameter<std::string>("target_color", "BLUE");
+    LightBarColor target_color =
+        (target_color_str == "RED") ? LightBarColor::RED : LightBarColor::BLUE;
 
-        // 用 ROS 参数重建检测器
-        std::string target_color_str = this->get_parameter("target_color").as_string();
-        LightBarColor target_color = (target_color_str == "RED") ? LightBarColor::RED : LightBarColor::BLUE;
+    Detector::Params det_params;
+    det_params.gray_threshold = this->declare_parameter<int>("gray_threshold", 100);
+    det_params.color_threshold = this->declare_parameter<int>("color_threshold", 100);
+    det_params.target_color = target_color;
+    detector_ = Detector(det_params);
 
-        Detector::Params det_params;
-        det_params.gray_threshold = this->get_parameter("gray_threshold").as_int();
-        det_params.color_threshold = this->get_parameter("color_threshold").as_int();
-        det_params.target_color = target_color;
-        detector_ = Detector(det_params);
+    LightDetector::Params light_params;
+    light_params.min_contours_area = this->declare_parameter<int>("min_contours_area", 30);
+    light_params.min_contours_ratio =
+        static_cast<float>(this->declare_parameter<double>("min_contours_ratio", 0.06));
+    light_params.max_contours_ratio =
+        static_cast<float>(this->declare_parameter<double>("max_contours_ratio", 0.5));
+    light_detector_ = LightDetector(light_params);
+}
 
-        LightDetector::Params light_params;
-        light_params.min_contours_area = this->get_parameter("min_contours_area").as_int();
-        light_params.min_contours_ratio = static_cast<float>(this->get_parameter("min_contours_ratio").as_double());
-        light_params.max_contours_ratio = static_cast<float>(this->get_parameter("max_contours_ratio").as_double());
-        light_detector_ = LightDetector(light_params);
-
-        camera_provider_.init();
-
-        image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-            "/image_raw", rclcpp::QoS(10),
-            [this](const sensor_msgs::msg::Image::SharedPtr msg) { run(msg); }
-        );
-
-        // Debug GUI
-        debug_gui_.setEnabled(debug_gui_enabled);
-        debug_gui_.start();
-
-        // Debug Observer 注册
-        debug_hub_.addObserver(std::make_shared<debug::DebugPreprocessView>(debug_gui_));
-        debug_hub_.addObserver(std::make_shared<debug::DebugLightView>(debug_gui_));
-
-        // Rosbag service clients
-        if (rosbag_control_enabled) {
-            toggle_paused_client_ = this->create_client<rosbag2_interfaces::srv::TogglePaused>(
-                rosbag_player_node + "/toggle_paused");
-            play_next_client_ = this->create_client<rosbag2_interfaces::srv::PlayNext>(
-                rosbag_player_node + "/play_next");
-            set_rate_client_ = this->create_client<rosbag2_interfaces::srv::SetRate>(
-                rosbag_player_node + "/set_rate");
-        }
-
-        // 按键轮询 timer
-        debug_key_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(15),
-            [this]() { pollDebugKeys(); }
-        );
-
-        RCLCPP_INFO(this->get_logger(), "armor_detector节点已启动.");
-        RCLCPP_INFO(this->get_logger(), "按键操作: [q/ESC]退出  [Space/p]暂停/继续  [n/→]单步  [s]保存ROI  [+/-]加速/减速");
+void DetectorNode::initDebug()
+{
+    if (!debug_config_.show) {
+        RCLCPP_INFO(this->get_logger(), "Debug GUI 已禁用 (debug.show=false)");
+        return;
     }
 
-    ~DetectorNode() override
-    {
-        debug_gui_.stop();
+    debug_gui_.setEnabled(true);
+    debug_gui_.start();
+
+    // 初始化图层状态（从 config 读取初始值）
+    layer_state_.setEnabled(debug::DebugLayer::PREPROCESS, debug_config_.preprocess);
+    layer_state_.setEnabled(debug::DebugLayer::LIGHTS, debug_config_.lights);
+    layer_state_.setEnabled(debug::DebugLayer::ARMOR_MATCH, debug_config_.armor_match);
+    layer_state_.setEnabled(debug::DebugLayer::CLASSIFICATION, debug_config_.classification);
+    layer_state_.setEnabled(debug::DebugLayer::POSE, debug_config_.pose);
+
+    // 始终注册 timing observer
+    debug_hub_.addObserver(
+        std::make_shared<debug::DebugTiming>(debug_config_.stats_interval));
+
+    // 注册图层 view observer（内部根据 layer state 决定是否绘制）
+    debug_hub_.addObserver(
+        std::make_shared<debug::DebugPreprocessView>(debug_gui_, layer_state_));
+    debug_hub_.addObserver(
+        std::make_shared<debug::DebugLightView>(debug_gui_, layer_state_));
+
+    // 注册图层控制器（处理数字键）
+    debug_hub_.addObserver(
+        std::make_shared<debug::DebugLayerController>(layer_state_));
+
+    // 按键轮询 timer
+    debug_key_timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(15),
+        [this]() { pollDebugKeys(); });
+
+    RCLCPP_INFO(this->get_logger(),
+                "按键操作: [q/ESC]退出  [Space/p]暂停/继续  [n/→]单步  "
+                "[s]保存ROI  [+/-]加速/减速  [1-5]切换图层");
+}
+
+void DetectorNode::initRosbagClients()
+{
+    if (!debug_config_.rosbag_control) {
+        return;
     }
-};
+    const auto & node = debug_config_.rosbag_player_node;
+    toggle_paused_client_ = this->create_client<rosbag2_interfaces::srv::TogglePaused>(
+        node + "/toggle_paused");
+    play_next_client_ = this->create_client<rosbag2_interfaces::srv::PlayNext>(
+        node + "/play_next");
+    set_rate_client_ = this->create_client<rosbag2_interfaces::srv::SetRate>(
+        node + "/set_rate");
+}
+
+// ===================== 主流程 =====================
 
 void DetectorNode::run(const sensor_msgs::msg::Image::SharedPtr & msg)
 {
     Frame frame = camera_provider_.receiveImage(msg);
 
-    // 构建 debug 上下文
     debug::DebugFrameContext ctx;
     ctx.frame_index = frame_index_++;
     ctx.stamp = frame.timestamp;
     ctx.source_bgr = frame.image;
     ctx.display_bgr = frame.image.clone();
 
-    // 预处理
+    debug_hub_.onFrameStart(ctx);
+
     cv::Mat img_thre = detector_.preprocess(frame.image);
     debug_hub_.onPreprocess(ctx, detector_.getPreprocessDebugData());
 
-    // 灯条检测
     auto lights = light_detector_.findLights(img_thre, frame.image);
     debug_hub_.onLights(ctx, light_detector_.getLightDebugData());
+    (void)lights;
 
-    // 一次性提交最终显示图像
-    debug_gui_.setFrame(debug_gui_window_name_, ctx.display_bgr);
+    debug_hub_.onFrameEnd(ctx);
+
+    if (debug_config_.show) {
+        debug_gui_.setFrame("debug_show", ctx.display_bgr);
+    }
 }
+
+// ===================== 按键处理 =====================
 
 void DetectorNode::pollDebugKeys()
 {
@@ -188,6 +189,10 @@ void DetectorNode::pollDebugKeys()
             break;
 
         case debug::DebugKeyAction::SAVE_ROI:
+            debug_hub_.onKey(event);
+            break;
+
+        case debug::DebugKeyAction::TOGGLE_LAYER:
             debug_hub_.onKey(event);
             break;
 

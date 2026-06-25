@@ -55,6 +55,15 @@ void DebugGUI::setFrame(const std::string & window_name, const cv::Mat & image, 
 void DebugGUI::loop()
 {
     while (running_.load()) {
+        // 销毁被 clearFrame 标记的窗口
+        {
+            std::lock_guard<std::mutex> lock(destroy_mutex_);
+            for (const auto & name : pending_destroy_) {
+                cv::destroyWindow(name);
+            }
+            pending_destroy_.clear();
+        }
+
         std::unordered_map<std::string, DebugWindowFrame> snapshot;
         {
             std::lock_guard<std::mutex> lock(frames_mutex_);
@@ -85,6 +94,18 @@ std::vector<DebugKeyEvent> DebugGUI::takeKeyEvents()
     events.assign(key_queue_.begin(), key_queue_.end());
     key_queue_.clear();
     return events;
+}
+
+void DebugGUI::clearFrame(const std::string & window_name)
+{
+    {
+        std::lock_guard<std::mutex> lock(frames_mutex_);
+        frames_.erase(window_name);
+    }
+    {
+        std::lock_guard<std::mutex> lock(destroy_mutex_);
+        pending_destroy_.push_back(window_name);
+    }
 }
 
 } // namespace armor_detector::debug

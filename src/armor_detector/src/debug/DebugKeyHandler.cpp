@@ -6,6 +6,7 @@ namespace armor_detector::debug
 DebugKeyEvent DebugKeyHandler::translate(int raw_key) const
 {
     DebugKeyAction action = DebugKeyAction::NONE;
+    DebugLayer layer = DebugLayer::UNKNOWN;
 
     if (raw_key == 27 || raw_key == 'q' || raw_key == 'Q')
     {
@@ -32,8 +33,33 @@ DebugKeyEvent DebugKeyHandler::translate(int raw_key) const
     {
         action = DebugKeyAction::PLAYBACK_RATE_DOWN;
     }
+    else if (raw_key == '1')
+    {
+        action = DebugKeyAction::TOGGLE_LAYER;
+        layer = DebugLayer::PREPROCESS;
+    }
+    else if (raw_key == '2')
+    {
+        action = DebugKeyAction::TOGGLE_LAYER;
+        layer = DebugLayer::LIGHTS;
+    }
+    else if (raw_key == '3')
+    {
+        action = DebugKeyAction::TOGGLE_LAYER;
+        layer = DebugLayer::ARMOR_MATCH;
+    }
+    else if (raw_key == '4')
+    {
+        action = DebugKeyAction::TOGGLE_LAYER;
+        layer = DebugLayer::CLASSIFICATION;
+    }
+    else if (raw_key == '5')
+    {
+        action = DebugKeyAction::TOGGLE_LAYER;
+        layer = DebugLayer::POSE;
+    }
 
-    return {action, raw_key};
+    return {action, raw_key, layer};
 }
 
 } // namespace armor_detector::debug

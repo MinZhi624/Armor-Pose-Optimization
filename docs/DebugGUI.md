@@ -134,10 +134,13 @@ BOTTOM_RIGHT  坐标、分类、PnP 等结果摘要
 
 | 位置 | 行号 | 内容 | 字体颜色(BGR) | 说明 |
 |---|---:|---|---|---|
-| TOP_LEFT | 1 | frame processing time | (0, 165, 255) | 当前帧或阶段处理用时 |
+| TOP_LEFT | 1 | frame processing time (total) | (0, 165, 255) | 当前帧总处理耗时，由 DebugTiming 绘制 |
 
 ## debug_show - Draw
 
 | 图层 | 元素 | 内容 | 颜色(BGR) | 样式 | 显示条件 | 说明 |
 |---|---|---|---|---|---|---|
-| base | none | reserved | none | none | none | 当前暂不注册图形绘制 |
+| lights | rotated_rect | accepted light bar | (0, 255, 0) | thickness=2, LINE_AA | layer lights ON | 已通过筛选的灯条 |
+| lights | point | light endpoints (top/bottom) | (255, 0, 255) | radius=1, filled | layer lights ON | 灯条端点标记 |
+| lights | rotated_rect | rejected light bar | (0, 0, 255) | thickness=2, LINE_AA | layer lights ON | 被拒绝的灯条 |
+| lights | text | reject reason detail | (0, 0, 255) | scale=0.60, thickness=2 | layer lights ON | 拒绝原因文字，偏移 +5px |

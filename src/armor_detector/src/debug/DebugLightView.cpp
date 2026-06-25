@@ -5,13 +5,17 @@
 namespace armor_detector::debug
 {
 
-DebugLightView::DebugLightView(DebugGUI & gui) : gui_(&gui) {}
+DebugLightView::DebugLightView(DebugGUI & gui, DebugLayerState & layer_state)
+    : gui_(&gui), layer_state_(layer_state)
+{
+}
 
 void DebugLightView::onLights(
     DebugFrameContext & context,
     const LightDebugData & data)
 {
     if (!gui_ || !gui_->enabled()) return;
+    if (!layer_state_.enabled(DebugLayer::LIGHTS)) return;
     if (context.display_bgr.empty()) return;
 
     cv::Mat & display = context.display_bgr;

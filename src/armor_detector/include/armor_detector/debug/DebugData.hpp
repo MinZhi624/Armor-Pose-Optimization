@@ -27,6 +27,21 @@ struct DebugFrameContext
 };
 
 /**
+ * @brief 可切换的 debug 图层标识。
+ *
+ * 用于 DebugLayerState 和数字键 (1-5) 切换。
+ * timing 不是图层——它在 debug.show=true 时始终启用。
+ */
+enum class DebugLayer {
+    UNKNOWN,
+    PREPROCESS,
+    LIGHTS,
+    ARMOR_MATCH,
+    CLASSIFICATION,
+    POSE,
+};
+
+/**
  * @brief 按键事件。DebugKeyHandler 负责从 cv::waitKey 的 raw key 转换得到。
  */
 enum class DebugKeyAction {
@@ -37,12 +52,14 @@ enum class DebugKeyAction {
     STEP_FRAME,
     PLAYBACK_RATE_UP,
     PLAYBACK_RATE_DOWN,
+    TOGGLE_LAYER,
 };
 
 struct DebugKeyEvent
 {
     DebugKeyAction action = DebugKeyAction::NONE;
     int raw_key = -1;
+    DebugLayer layer = DebugLayer::UNKNOWN;
 };
 
 /**

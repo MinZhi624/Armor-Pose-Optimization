@@ -41,6 +41,9 @@ public:
     // ROS 线程调用: 取走并清空 pending key events
     std::vector<DebugKeyEvent> takeKeyEvents();
 
+    // 线程安全: 从 frames_ 移除同名窗口帧，并请求 GUI 线程销毁窗口
+    void clearFrame(const std::string & window_name);
+
 private:
     void loop();    // GUI 线程主循环
 
@@ -58,6 +61,10 @@ private:
     std::deque<DebugKeyEvent> key_queue_;
 
     DebugKeyHandler key_handler_;
+
+    // 待销毁窗口列表，由 clearFrame() 写入，loop() 中 GUI 线程消费
+    std::mutex destroy_mutex_;
+    std::vector<std::string> pending_destroy_;
 };
 
 } // namespace armor_detector::debug

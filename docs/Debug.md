@@ -129,18 +129,19 @@ if (debug_preprocess) {
 }
 ```
 
-后续配置建议按功能分组，例如：
+配置结构：
 
 ```yaml
 debug:
-  timing: true
   show: true
+  rosbag_control: true
+  rosbag_player_node: "/rosbag2_player"
   preprocess: false
   lights: true
-  armor_match: true
+  armor_match: false
   classification: false
-  pose: true
-  roi_recorder: false
+  pose: false
+  stats_interval: 50
 ```
 
 ## GUI 规范
@@ -161,12 +162,33 @@ debug:
 
 ```text
 EXIT          退出节点 / 关闭窗口
-PAUSE_TOGGLE  本节点 debug 暂停/继续；未来可映射到 rosbag2 TogglePaused 服务
-STEP_FRAME    预留；未来可映射到 rosbag2 PlayNext 服务
-SAVE_ROI      预留；保存路径暂不规范
+PAUSE_TOGGLE  rosbag 暂停/继续
+STEP_FRAME    rosbag 单步
+SAVE_ROI      保存 ROI（预留）
+TOGGLE_LAYER  切换图层显示（数字键 1-5）
 ```
 
 Observer 不直接读 `cv::waitKey`，只在 `onKey` 中响应语义动作。
+
+## 图层切换
+
+数字键 1–5 切换对应 debug 图层的显示状态：
+
+| 按键 | 图层 | 说明 |
+|---|---|---|
+| 1 | preprocess | 预处理中间图（独立窗口 preprocess_debug） |
+| 2 | lights | 灯条检测结果（叠加到 debug_show） |
+| 3 | armor_match | 装甲板匹配（预留，当前只切状态） |
+| 4 | classification | 数字分类（预留，当前只切状态） |
+| 5 | pose | 位姿解算（预留，当前只切状态） |
+
+切换后输出日志，例如：`DEBUG layer lights: ON`
+
+## Timing 行为
+
+- `timing` 不是图层——`debug.show=true` 时始终启用，无法通过数字键关闭。
+- 每帧在 `debug_show` 左上角绘制 `Process` 总耗时和各阶段耗时。
+- 每 `debug.stats_interval` 帧（默认 50）打印一次平均耗时日志。
 
 ## rosbag 控制规划
 

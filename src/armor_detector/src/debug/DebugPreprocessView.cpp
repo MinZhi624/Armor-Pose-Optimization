@@ -5,14 +5,29 @@
 namespace armor_detector::debug
 {
 
-DebugPreprocessView::DebugPreprocessView(DebugGUI & gui) : gui_(&gui) {}
+DebugPreprocessView::DebugPreprocessView(DebugGUI & gui, DebugLayerState & layer_state)
+    : gui_(&gui), layer_state_(layer_state)
+{
+}
 
 void DebugPreprocessView::onPreprocess(
     DebugFrameContext & context,
     const PreprocessDebugData & data)
 {
     if (!gui_ || !gui_->enabled()) return;
+
+    // 图层关闭：清理旧窗口后返回
+    if (!layer_state_.enabled(DebugLayer::PREPROCESS)) {
+        if (was_shown_) {
+            gui_->clearFrame("preprocess_debug");
+            was_shown_ = false;
+        }
+        return;
+    }
+
     if (context.source_bgr.empty()) return;
+
+    was_shown_ = true;
 
     // 原图 resize 0.5
     cv::Mat src_half;
@@ -43,7 +58,7 @@ void DebugPreprocessView::onPreprocess(
     cv::hconcat(binary_half, color_half, bottom);
     cv::vconcat(top, bottom, combined);
 
-    // 文字标注（遵循 DebugGUI.md: FONT_HERSHEY_SIMPLEX, scale 0.60, thickness 2）
+    // 文字标注
     int w = src_half.cols;
     int h = src_half.rows;
     cv::putText(combined, "source", cv::Point(10, 24),

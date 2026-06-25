@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace armor_detector::debug
 {
@@ -37,6 +39,10 @@ private:
     std::chrono::steady_clock::time_point last_mark_;
     std::map<std::string, double> stage_time_sums_;
     double frame_time_sum_ms_ = 0.0;
+
+    // 当前帧的阶段耗时（用于 onFrameEnd 绘制文字）
+    double last_frame_ms_ = 0.0;
+    std::vector<std::pair<std::string, double>> last_stage_ms_;
 };
 
 } // namespace armor_detector::debug
