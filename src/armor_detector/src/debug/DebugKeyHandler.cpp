@@ -1,0 +1,31 @@
+#include "armor_detector/debug/DebugKeyHandler.hpp"
+
+namespace armor_detector::debug
+{
+
+DebugKeyEvent DebugKeyHandler::translate(int raw_key) const
+{
+    DebugKeyAction action = DebugKeyAction::NONE;
+
+    if (raw_key == 27 || raw_key == 'q' || raw_key == 'Q')
+    {
+        action = DebugKeyAction::EXIT;
+    }
+    else if (raw_key == ' ' || raw_key == 'p' || raw_key == 'P')
+    {
+        action = DebugKeyAction::PAUSE_TOGGLE;
+    }
+    else if (raw_key == 'n' || raw_key == 'N' || raw_key == 65363 || raw_key == 2555904 ||
+             raw_key == 0x270000)
+    {
+        action = DebugKeyAction::STEP_FRAME;
+    }
+    else if (raw_key == 's' || raw_key == 'S')
+    {
+        action = DebugKeyAction::SAVE_ROI;
+    }
+
+    return {action, raw_key};
+}
+
+} // namespace armor_detector::debug

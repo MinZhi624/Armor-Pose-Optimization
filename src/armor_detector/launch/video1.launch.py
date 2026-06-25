@@ -1,8 +1,9 @@
+import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess
 from launch_ros.actions import Node
-import os
-from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
@@ -15,7 +16,11 @@ def generate_launch_description():
     return LaunchDescription([
         # 播放 rosbag
         ExecuteProcess(
-            cmd=['ros2', 'bag', 'play', rosbag_path, '--loop'],
+            cmd=[
+                'ros2', 'bag', 'play', rosbag_path, '--loop',
+                '--disable-keyboard-controls',
+                '--remap', '__node:=rosbag2_player'
+            ],
             output='screen'
         ),
 

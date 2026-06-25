@@ -14,16 +14,19 @@ find_package(OpenCV REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(rosbag2_interfaces REQUIRED)
 
 add_executable(armor_detector_node
   src/DetectorNode.cpp
-  src/ArmorDetector.cpp
-  src/Detector.cpp
+  src/detector/ArmorDetector.cpp
+  src/detector/Detector.cpp
   src/CameraProvider.cpp
   src/PoseSolver.cpp
-  src/LightDetector.cpp
-  src/DebugGui.cpp
-  src/DebugMsg.cpp
+  src/detector/LightDetector.cpp
+  src/debug/DebugGUI.cpp
+  src/debug/DebugMsg.cpp
+  src/debug/DebugKeyHandler.cpp
 )
 
 target_include_directories(armor_detector_node PUBLIC
@@ -36,9 +39,11 @@ ament_target_dependencies(armor_detector_node
   ament_index_cpp
   cv_bridge
   sensor_msgs
+  rosbag2_interfaces
 )
 
-target_link_libraries(armor_detector_node ${OpenCV_LIBS} yaml-cpp)
+target_include_directories(armor_detector_node PUBLIC ${EIGEN3_INCLUDE_DIRS})
+target_link_libraries(armor_detector_node ${OpenCV_LIBS} yaml-cpp Eigen3::Eigen)
 
 install(TARGETS armor_detector_node
   DESTINATION lib/${PROJECT_NAME}

@@ -1,0 +1,74 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p build)",
+      "Bash(cmake ..)",
+      "Bash(cmake *)",
+      "Bash(make)",
+      "WebSearch",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(chmod +x *)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(touch /tmp/claude-plan-mode)",
+      "Bash(rm -f /tmp/claude-plan-mode)",
+      "Bash(CLAUDE_FILE_PATH=\"src/main.cpp\" ./.claude/hooks/check-naming.sh)",
+      "Bash(CLAUDE_FILE_PATH=\"README.md\" ./.claude/hooks/check-naming.sh)",
+      "Bash(./.claude/hooks/enter-plan-mode.sh)",
+      "Read(//tmp/**)",
+      "Bash(./.claude/hooks/exit-plan-mode.sh)",
+      "Bash(./.claude/hooks/check-task-delegation.sh)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-naming.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "EnterPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/enter-plan-mode.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/exit-plan-mode.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-task-delegation.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-build-check.sh",
+            "if": "echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git commit'"
+          }
+        ]
+      }
+    ]
+  }
+}
