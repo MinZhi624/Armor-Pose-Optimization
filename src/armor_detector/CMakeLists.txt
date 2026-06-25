@@ -16,6 +16,7 @@ find_package(cv_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(rosbag2_interfaces REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_executable(armor_detector_node
   src/DetectorNode.cpp
@@ -23,6 +24,7 @@ add_executable(armor_detector_node
   src/detector/Detector.cpp
   src/CameraProvider.cpp
   src/PoseSolver.cpp
+  src/yaw/YawSearch.cpp
   src/detector/LightDetector.cpp
   src/NumberClassifier.cpp
   src/debug/DebugGUI.cpp
@@ -35,6 +37,7 @@ add_executable(armor_detector_node
   src/debug/DebugResultView.cpp
   src/debug/DebugTiming.cpp
   src/debug/DebugLayerController.cpp
+  src/debug/DebugPoseMarkerPublisher.cpp
 )
 
 target_include_directories(armor_detector_node PUBLIC
@@ -48,6 +51,7 @@ ament_target_dependencies(armor_detector_node
   cv_bridge
   sensor_msgs
   rosbag2_interfaces
+  visualization_msgs
 )
 
 target_include_directories(armor_detector_node PUBLIC ${EIGEN3_INCLUDE_DIRS})

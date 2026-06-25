@@ -8,66 +8,15 @@
 - 如果代码实现和参考依据不一致，必须在本文档说明原因。
 - 如果一个算法有多个可选方案，先在本文档记录优缺点和当前选择，再实现代码。
 - 算法代码中的关键公式注释，应能对应回本文档的小节。
-- 只属于工程组织、窗口显示、文件保存的内容不需要放在这里；全局数据约定见 `Conventions.md`，debug 规范见 `Debug.md`，GUI 注册规范见 `DebugGUI.md`。
-
-## 登记格式
-
-每个算法按下面格式登记：
-
-```text
-## 模块 / 算法名
-
-### 参考来源
-
-- 来源名称：
-- 来源位置：
-- 参考内容：
-
-### 输入
-
-- 输入数据：
-- 坐标系：
-- 单位：
-
-### 输出
-
-- 输出数据：
-- 坐标系：
-- 单位：
-
-### 核心公式 / 判断条件
-
-- 公式或条件：
-- 参数含义：
-
-### 当前选择
-
-- 采用方案：
-- 选择原因：
-- 已知限制：
-
-### 对应代码
-
-- 头文件：
-- 实现文件：
-- 主要函数：
-```
-
-## 全局数据约定
-
-单位、坐标系、装甲板角点顺序和 `cv::Mat` 生命周期统一见 `Conventions.md`。本文件只登记每个算法使用了哪些输入、输出和判断依据，不重新定义全局规则。
 
 ## 当前算法登记表
-
-下面先放空模板。实现对应模块前，应先补充参考依据。
 
 ## 图像预处理
 
 ### 参考来源
 
-- 来源名称：待补充
-- 来源位置：待补充
-- 参考内容：待补充
+- 来源名称：OpenCV 阈值处理
+- 参考内容：灰度转换 + 颜色阈值分割
 
 ### 输入
 
@@ -77,258 +26,188 @@
 
 ### 输出
 
-- 输出数据：灰度图、二值图、颜色 mask 等
+- 输出数据：二值图 (img_thre)
 - 坐标系：image pixel
-- 单位：`px`
-
-### 核心公式 / 判断条件
-
-- 待补充
-
-### 当前选择
-
-- 采用方案：待补充
-- 选择原因：待补充
-- 已知限制：待补充
 
 ### 对应代码
 
 - 头文件：`include/armor_detector/detector/Detector.hpp`
 - 实现文件：`src/detector/Detector.cpp`
-- 主要函数：待补充
 
 ## 灯条检测
 
 ### 参考来源
 
-- 来源名称：待补充
-- 来源位置：待补充
-- 参考内容：待补充
+- 来源名称：OpenCV 轮廓检测 + RotatedRect
+- 参考内容：从二值图提取灯条轮廓，拟合旋转矩形
 
 ### 输入
 
-- 输入数据：预处理结果、原始图像
+- 输入数据：二值图、原始图像
 - 坐标系：image pixel
-- 单位：`px`
 
 ### 输出
 
-- 输出数据：`LightBar` 列表、拒绝原因
-- 坐标系：image pixel
-- 单位：`px` / `deg`
-
-### 核心公式 / 判断条件
-
-- 面积阈值：待补充
-- 长宽比：待补充
-- 角度判断：待补充
-- 颜色判断：待补充
-
-### 当前选择
-
-- 采用方案：待补充
-- 选择原因：待补充
-- 已知限制：待补充
+- 输出数据：`LightBar` 列表
 
 ### 对应代码
 
 - 头文件：`include/armor_detector/detector/LightDetector.hpp`
 - 实现文件：`src/detector/LightDetector.cpp`
-- 主要函数：待补充
 
 ## 装甲板匹配
 
 ### 参考来源
 
-- 来源名称：待补充
-- 来源位置：待补充
-- 参考内容：待补充
+- 来源名称：RoboMaster 灯条配对规则
+- 参考内容：左右灯条按 x 坐标排序，角度差/长度差/距离比例筛选
 
 ### 输入
 
 - 输入数据：`LightBar` 列表
-- 坐标系：image pixel
-- 单位：`px` / `deg`
 
 ### 输出
 
-- 输出数据：`ArmorCandidate` 列表、`RejectedArmor` 列表
-- 坐标系：image pixel
-- 单位：`px` / ratio
+- 输出数据：`ArmorCandidate` 列表
 
-### 核心公式 / 判断条件
+### 判断条件
 
-- 左右灯条排序：待补充
-- 角度差：待补充
-- 长度差：待补充
-- x / y 差异比例：待补充
-- 距离比例：待补充
-- 大小装甲板判定：待补充
-
-### 当前选择
-
-- 采用方案：待补充
-- 选择原因：待补充
-- 已知限制：待补充
+- 角度差阈值：`max_angle_diff` (默认 15°)
+- 长度比：`min_length_ratio` (默认 0.7)
+- x 差异比：`min_x_diff_ratio` (默认 0.75)
+- 距离比范围：`min_distance_ratio` ~ `max_distance_ratio`
+- 大小装甲板判定：`kLargeArmorDistanceRatio = 2.8`
 
 ### 对应代码
 
 - 头文件：`include/armor_detector/detector/ArmorDetector.hpp`
 - 实现文件：`src/detector/ArmorDetector.cpp`
-- 主要函数：待补充
 
 ## 数字分类
 
 ### 参考来源
 
-- 来源名称：待补充
-- 来源位置：待补充
-- 参考内容：待补充
+- 来源名称：ONNX CNN
+- 参考内容：数字 ROI 裁剪后送入轻量 CNN 分类
 
 ### 输入
 
 - 输入数据：装甲板候选、数字 ROI
 - 坐标系：image pixel
-- 单位：`px`
 
 ### 输出
 
-- 输出数据：`ArmorClassification`
-- 坐标系：无
-- 单位：class / confidence (`0.0~1.0`)
-
-### 核心公式 / 判断条件
-
-- ROI 裁剪规则：待补充
-- 模型输入尺寸：待补充
-- 置信度阈值：待补充
-- NONE 判定：待补充
-
-### 当前选择
-
-- 采用方案：待补充
-- 选择原因：待补充
-- 已知限制：待补充
+- 输出数据：`ClassifiedArmor` 列表（含 `ArmorName` + `confidence`）
 
 ### 对应代码
 
 - 头文件：`include/armor_detector/NumberClassifier.hpp`
-- 实现文件：待补充
-- 主要函数：待补充
+- 实现文件：`src/NumberClassifier.cpp`
 
 ## PnP 位姿解算
 
 ### 参考来源
 
-- 来源名称：待补充
-- 来源位置：待补充
-- 参考内容：待补充
+- 来源名称：OpenCV solvePnP + 参考项目 PoseSolver
+- 来源位置：`/home/minzhi/Desktop/Visual-Translationo/src/armor_plate_identification`
+- 参考内容：IPPE 双解 + iterative fallback，几何选择 + yaw 连续性修正
 
 ### 输入
 
-- 输入数据：装甲板 2D 角点（顺序见 `Conventions.md`）、装甲板 3D 模型点、相机内参、畸变参数
+- 输入数据：装甲板 2D 角点、3D 模型点、相机内参、畸变参数
 - 坐标系：image pixel / armor local / camera
 - 单位：`px` / `m`
 
 ### 输出
 
-- 输出数据：`ArmorPose`
+- 输出数据：`SolvedArmor`（含 `ArmorPose`）
 - 坐标系：camera / gimbal
 - 单位：`m` / `rad`
 
-### 核心公式 / 判断条件
+### 3D 模型点
 
-- 小装甲板 3D 点：待补充
-- 大装甲板 3D 点：待补充
-- `solvePnP` 方法选择：待补充
-- camera 到 gimbal 固定转换：待补充
-- yaw / pitch / distance 计算：待补充
+小装甲板 (0.135m × 0.055m)：
 
-### 当前选择
+```text
+(0, +0.0675, +0.0275)  left_top
+(0, -0.0675, +0.0275)  right_top
+(0, -0.0675, -0.0275)  right_bottom
+(0, +0.0675, -0.0275)  left_bottom
+```
 
-- 采用方案：待补充
-- 选择原因：待补充
-- 已知限制：待补充
+大装甲板 (0.225m × 0.055m)：
+
+```text
+(0, +0.1125, +0.0275)  left_top
+(0, -0.1125, +0.0275)  right_top
+(0, -0.1125, -0.0275)  right_bottom
+(0, +0.1125, -0.0275)  left_bottom
+```
+
+坐标系：X 法向量，Y 左，Z 上。
+
+### PnP 流程
+
+1. 优先 `cv::solvePnPGeneric(..., SOLVEPNP_IPPE)` 获取 2 个候选
+2. IPPE 无候选时 fallback 到 `cv::solvePnP(..., SOLVEPNP_ITERATIVE)`
+3. 每个候选计算 yaw、world_pitch、重投影误差
+4. `selectByGeometry`: pitch 合法性 + 重投影误差最小
+5. `selectBestCandidate`: 帧间 yaw 连续性修正突变解
+6. yaw 重投影优化（YawSearch）
 
 ### 对应代码
 
 - 头文件：`include/armor_detector/PoseSolver.hpp`
 - 实现文件：`src/PoseSolver.cpp`
-- 主要函数：待补充
 
 ## yaw 优化 / 搜索
 
 ### 参考来源
 
-- 来源名称：待补充
-- 来源位置：待补充
-- 参考内容：待补充
+- 来源名称：参考项目 YawSearch
+- 来源位置：`/home/minzhi/Desktop/Visual-Translationo/src/armor_plate_identification/src/yaw/YawSearch.cpp`
+- 参考内容：两阶段搜索（枚举粗搜 + 三分精搜）
 
 ### 输入
 
-- 输入数据：PnP 初值、装甲板角点（顺序见 `Conventions.md`）、装甲板模型、相机参数
-- 坐标系：image pixel / camera / gimbal
-- 单位：`px` / `m` / `rad`
+- 输入数据：PnP 初始 yaw、重投影误差函数
+- 坐标系：gimbal
+- 单位：`rad`
 
 ### 输出
 
-- 输出数据：优化后的 yaw、重投影误差
-- 坐标系：camera / gimbal
-- 单位：`rad` / `px`
+- 输出数据：优化后的 yaw
+- 单位：`rad`
 
-### 核心公式 / 判断条件
+### 搜索参数
 
-- 误差函数：待补充
-- 搜索范围：待补充
-- 搜索步长：待补充
-- 迭代次数：待补充
-- fallback 条件：待补充
+| 参数 | 值 | 说明 |
+|---|---|---|
+| 搜索范围 | 30° | 枚举区间半径 |
+| 枚举步长 | 4° | 粗搜采样间隔 |
+| 局部范围 | 3° | 三分搜索区间半径 |
+| 三分迭代 | 8 次 | 精搜迭代次数 |
 
-### 当前选择
+### 流程
 
-- 采用方案：待补充
-- 选择原因：待补充
-- 已知限制：待补充
+1. 枚举 `[center - 30°, center + 30°]`，每 4° 采样，找最小误差 yaw
+2. 在粗搜结果 ±3° 范围内做 8 次三分搜索精修
+3. 返回精修后的 yaw
 
 ### 对应代码
 
-- 头文件：待补充
-- 实现文件：待补充
-- 主要函数：待补充
+- 头文件：`include/armor_detector/yaw/YawSearch.hpp`
+- 实现文件：`src/yaw/YawSearch.cpp`
+- 主要函数：`runYawSearch(center_yaw, error_func)`
 
 ## 拒绝原因与调试数据
 
 ### 参考来源
 
 - 来源名称：工程约定
-- 来源位置：`docs/Conventions.md`、`docs/Debug.md`、`docs/DebugGUI.md`
 - 参考内容：debug 数据只记录阶段结果，不改变算法输出
-
-### 输入
-
-- 输入数据：各阶段候选与判断结果
-- 坐标系：根据阶段决定
-- 单位：根据阶段决定
-
-### 输出
-
-- 输出数据：`DebugRejectReason`、`RejectedLight`、`RejectedArmor` 等
-- 坐标系：根据阶段决定
-- 单位：根据阶段决定
-
-### 核心公式 / 判断条件
-
-- 拒绝原因应对应实际算法判断条件。
-- 不允许为了 debug 单独制造与算法不一致的判断。
-
-### 当前选择
-
-- 采用方案：debug 数据跟随算法阶段输出
-- 选择原因：方便定位算法拒绝路径
-- 已知限制：当前不做跨包 debug 聚合
 
 ### 对应代码
 
 - 头文件：`include/armor_detector/debug/DebugData.hpp`
 - 实现文件：按具体 Observer 决定
-- 主要函数：待补充

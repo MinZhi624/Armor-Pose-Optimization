@@ -4,10 +4,10 @@
 
 This repository contains one ROS 2 package, `armor_detector`, for RoboMaster armor plate detection.
 
-- `src/armor_detector/include/armor_detector/`: public headers, organized by component (`detector/`, `debug/`, `types/`).
-- `src/armor_detector/src/`: C++ implementations for the node, camera provider, detector pipeline, pose solver, and debug UI.
-- `src/armor_detector/config/`: runtime YAML configuration, including camera calibration.
-- `src/armor_detector/launch/`: ROS 2 launch files such as `video1.launch.py`.
+- `src/armor_detector/include/armor_detector/`: public headers, organized by component (`detector/`, `debug/`, `types/`, `tools/`, `yaw/`).
+- `src/armor_detector/src/`: C++ implementations for the node, camera provider, detector pipeline, pose solver, yaw search, and debug UI.
+- `src/armor_detector/config/`: runtime YAML configuration, including camera calibration and playback settings.
+- `src/armor_detector/launch/`: ROS 2 launch files — `video1.launch.py` (interactive) and `auto_test.launch.py` (headless).
 - `src/armor_detector/Test/video/`: rosbag-based test data (`video1` through `video5`).
 - `docs/`: design notes and data conventions. Follow `docs/Conventions.md` for units, coordinate frames, corner ordering, and `cv::Mat` lifetime rules.
 
@@ -20,11 +20,18 @@ Run commands from the repository root:
 ```bash
 colcon build --packages-select armor_detector
 source install/setup.bash
+
+# 交互模式
 ros2 launch armor_detector video1.launch.py
+
+# 自动测试
+ros2 launch armor_detector auto_test.launch.py frame_count:=150
+
+# 格式检查
+clang-format --dry-run --Werror src/armor_detector/src/*.cpp src/armor_detector/include/armor_detector/*.hpp
+
 colcon test --packages-select armor_detector
 ```
-
-`colcon build` compiles the package and exports `compile_commands.json`. `source install/setup.bash` makes the package available in the current shell. The launch command plays the sample rosbag and opens the detector display; press `ESC` to exit. `colcon test` runs enabled ament lint checks.
 
 ## Coding Style & Naming Conventions
 
@@ -34,7 +41,7 @@ Prefer descriptive names that include units where relevant, for example `angle_d
 
 ## Testing Guidelines
 
-Current validation is primarily rosbag playback plus ament lint. When adding tests, keep them inside the package, name them after the behavior under test, and make them runnable through `colcon test --packages-select armor_detector`. Use the existing `Test/video` datasets for integration checks and document any new dataset assumptions.
+Current validation is primarily rosbag playback plus ament lint. Use `auto_test.launch.py` for headless fixed-frame testing. When adding tests, keep them inside the package, name them after the behavior under test, and make them runnable through `colcon test --packages-select armor_detector`. Use the existing `Test/video` datasets for integration checks and document any new dataset assumptions.
 
 ## Commit & Pull Request Guidelines
 

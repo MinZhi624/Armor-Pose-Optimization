@@ -2,10 +2,12 @@
 
 #include "armor_detector/CameraProvider.hpp"
 #include "armor_detector/NumberClassifier.hpp"
+#include "armor_detector/PoseSolver.hpp"
 #include "armor_detector/debug/DebugData.hpp"
 #include "armor_detector/debug/DebugGUI.hpp"
 #include "armor_detector/debug/DebugHub.hpp"
 #include "armor_detector/debug/DebugLayerState.hpp"
+#include "armor_detector/debug/DebugPoseMarkerPublisher.hpp"
 #include "armor_detector/detector/ArmorDetector.hpp"
 #include "armor_detector/detector/Detector.hpp"
 #include "armor_detector/detector/LightDetector.hpp"
@@ -55,6 +57,7 @@ namespace armor_detector {
 
         void run(const sensor_msgs::msg::Image::SharedPtr &msg);
         void pollDebugKeys();
+        void sendPlayNext();
 
         // 检测组件
         CameraProvider camera_provider_;
@@ -62,6 +65,7 @@ namespace armor_detector {
         LightDetector light_detector_;
         ArmorDetector armor_detector_;
         NumberClassifier number_classifier_;
+        PoseSolver pose_solver_;
 
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
 
@@ -78,6 +82,16 @@ namespace armor_detector {
         rclcpp::Client<rosbag2_interfaces::srv::SetRate>::SharedPtr set_rate_client_;
 
         double playback_rate_ = 1.0;
+
+        // Auto test / step playback
+        std::size_t processed_frame_count_ = 0;
+        std::size_t max_frames_ = 0;
+        bool exit_on_complete_ = false;
+        bool step_playback_ = false;
+        bool play_next_in_flight_ = false;
+        bool play_next_needed_ = false;
+        rclcpp::TimerBase::SharedPtr play_next_timer_;
+
         std::size_t frame_index_ = 0;
     };
 

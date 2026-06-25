@@ -53,7 +53,6 @@ namespace armor_detector {
         Eigen::Vector3d ypr_gimbal;
         Eigen::Vector3d ypd_camera;
         Eigen::Vector3d ypd_gimbal;
-
         float image_distance_to_center = 0.0f;
     };
     /////////// 聚合数据结构 //////////

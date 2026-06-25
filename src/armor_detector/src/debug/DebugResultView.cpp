@@ -16,8 +16,8 @@ void DebugResultView::onClassification(
     cv::Mat &display = context.display_bgr;
     for (const auto &armor : data.classified_armors) {
         const auto &c = armor.geometry.corners;
-        cv::line(display, c[0], c[2], cv::Scalar(0, 255, 255), 1, cv::LINE_AA);
-        cv::line(display, c[1], c[3], cv::Scalar(0, 255, 255), 1, cv::LINE_AA);
+        cv::line(display, c[0], c[2], cv::Scalar(255, 0, 255), 1, cv::LINE_AA);
+        cv::line(display, c[1], c[3], cv::Scalar(255, 0, 255), 1, cv::LINE_AA);
     }
 }
 

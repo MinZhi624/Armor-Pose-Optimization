@@ -47,7 +47,7 @@ namespace armor_detector {
     }
 
     Frame CameraProvider::receiveImage(const sensor_msgs::msg::Image::SharedPtr &msg) {
-        cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(msg, msg->encoding);
+        cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(msg, "bgr8");
         Frame frame;
         frame.image = cv_ptr->image;
         frame.timestamp = msg->header.stamp;

@@ -19,12 +19,24 @@ namespace armor_detector {
         initParameters();
         initDetectors();
         camera_provider_.init();
+        pose_solver_.init(camera_provider_.getCameraInfo());
 
         image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
             "/image_raw", rclcpp::QoS(10), [this](const sensor_msgs::msg::Image::SharedPtr msg) { run(msg); });
 
         initDebug();
         initRosbagClients();
+
+        // Step 模式：等待 service ready 后发送第一帧请求
+        if (step_playback_) {
+            RCLCPP_INFO(this->get_logger(), "Step 播放模式: 等待 play_next service...");
+            play_next_timer_ = this->create_wall_timer(std::chrono::milliseconds(100), [this]() {
+                if (play_next_client_ && play_next_client_->service_is_ready()) {
+                    play_next_timer_->cancel();
+                    sendPlayNext();
+                }
+            });
+        }
 
         RCLCPP_INFO(this->get_logger(), "armor_detector节点已启动.");
     }
@@ -49,6 +61,12 @@ namespace armor_detector {
         debug_config_.result = this->declare_parameter<bool>("debug.result", true);
         debug_config_.stats_interval =
             static_cast<std::size_t>(this->declare_parameter<int>("debug.stats_interval", 50));
+
+        // Playback 配置
+        std::string playback_mode = this->declare_parameter<std::string>("playback.mode", "realtime");
+        step_playback_ = (playback_mode == "step");
+        max_frames_ = static_cast<std::size_t>(this->declare_parameter<int>("playback.max_frames", 0));
+        exit_on_complete_ = this->declare_parameter<bool>("playback.exit_on_complete", false);
     }
 
     void DetectorNode::initDetectors() {
@@ -89,14 +107,6 @@ namespace armor_detector {
     }
 
     void DetectorNode::initDebug() {
-        if (!debug_config_.show) {
-            RCLCPP_INFO(this->get_logger(), "Debug GUI 已禁用 (debug.show=false)");
-            return;
-        }
-
-        debug_gui_.setEnabled(true);
-        debug_gui_.start();
-
         // 初始化图层状态（从 config 读取初始值）
         layer_state_.setEnabled(debug::DebugLayer::PREPROCESS, debug_config_.preprocess);
         layer_state_.setEnabled(debug::DebugLayer::LIGHTS, debug_config_.lights);
@@ -105,20 +115,26 @@ namespace armor_detector {
         layer_state_.setEnabled(debug::DebugLayer::POSE, debug_config_.pose);
         layer_state_.setEnabled(debug::DebugLayer::RESULT, debug_config_.result);
 
-        // 始终注册 timing observer
+        // 非 GUI observer：始终注册
         debug_hub_.addObserver(std::make_shared<debug::DebugTiming>(debug_config_.stats_interval));
+        debug_hub_.addObserver(std::make_shared<debug::DebugPoseMarkerPublisher>(*this, layer_state_));
 
-        // 注册图层 view observer（内部根据 layer state 决定是否绘制）
+        // GUI observer：仅 debug.show=true 时注册
+        if (!debug_config_.show) {
+            RCLCPP_INFO(this->get_logger(), "Debug GUI 已禁用 (debug.show=false)");
+            return;
+        }
+
+        debug_gui_.setEnabled(true);
+        debug_gui_.start();
+
         debug_hub_.addObserver(std::make_shared<debug::DebugPreprocessView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugLightView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugArmorMatchView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugResultView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugClassificationView>(debug_gui_, layer_state_));
-
-        // 注册图层控制器（处理数字键）
         debug_hub_.addObserver(std::make_shared<debug::DebugLayerController>(layer_state_));
 
-        // 按键轮询 timer
         debug_key_timer_ = this->create_wall_timer(std::chrono::milliseconds(15), [this]() { pollDebugKeys(); });
 
         RCLCPP_INFO(this->get_logger(),
@@ -164,12 +180,55 @@ namespace armor_detector {
 
         auto classified = number_classifier_.classify(candidates, frame.image);
         debug_hub_.onClassification(ctx, number_classifier_.getClassificationDebugData());
+        auto solved = pose_solver_.solve(classified);
+        debug_hub_.onPoseSolved(ctx, pose_solver_.getPoseDebugData());
 
         debug_hub_.onFrameEnd(ctx);
 
         if (debug_config_.show) {
             debug_gui_.setFrame("debug_show", ctx.display_bgr);
         }
+
+        // 帧计数与 step 播放
+        ++processed_frame_count_;
+
+        if (processed_frame_count_ == 1) {
+            RCLCPP_INFO(this->get_logger(), "第一帧处理完成");
+        }
+
+        if (max_frames_ > 0 && processed_frame_count_ >= max_frames_) {
+            RCLCPP_INFO(this->get_logger(), "auto test completed: %zu frames", processed_frame_count_);
+            rclcpp::shutdown();
+            return;
+        }
+
+        if (step_playback_) {
+            play_next_needed_ = true;
+            sendPlayNext();
+        }
+    }
+
+    // ===================== Step 播放 =====================
+
+    void DetectorNode::sendPlayNext() {
+        if (play_next_in_flight_ || !play_next_client_ || !play_next_client_->service_is_ready()) {
+            return;
+        }
+        play_next_in_flight_ = true;
+        play_next_needed_ = false;
+        (void)play_next_client_->async_send_request(
+            std::make_shared<rosbag2_interfaces::srv::PlayNext::Request>(),
+            [this](rclcpp::Client<rosbag2_interfaces::srv::PlayNext>::SharedFuture future) {
+                play_next_in_flight_ = false;
+                if (!future.get()->success) {
+                    RCLCPP_ERROR(this->get_logger(), "play_next 失败 (frame=%zu)", processed_frame_count_);
+                    rclcpp::shutdown();
+                    return;
+                }
+                if (play_next_needed_) {
+                    sendPlayNext();
+                }
+            });
     }
 
     // ===================== 按键处理 =====================

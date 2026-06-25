@@ -1,7 +1,7 @@
 armor_detector_node_cpp:
   ros__parameters:
     # 目标颜色
-    target_color: "BLUE"
+    target_color: "RED"
 
     # 预处理
     gray_threshold: 100
@@ -33,6 +33,16 @@ armor_detector_node_cpp:
       lights: false
       armor_match: false
       classification: false
-      pose: false
+      pose: true
       result: true
       stats_interval: 50
+
+    # Playback
+    # mode: "realtime" - rosbag 按时间正常播放
+    #        "step"    - 处理完一帧后再请求播放下一帧（用于 auto test）
+    # max_frames: 0 表示不限制帧数；>0 时处理指定帧数后退出
+    # exit_on_complete: true 时达到 max_frames 后自动 rclcpp::shutdown()
+    playback:
+      mode: "realtime"
+      max_frames: 0
+      exit_on_complete: false

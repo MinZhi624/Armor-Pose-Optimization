@@ -20,21 +20,25 @@ include/armor_detector/debug/
 src/debug/
 ```
 
-命名建议：
+当前已有文件：
 
 ```text
-DebugData.hpp             阶段 debug 数据结构
-IDebugObserver.hpp        Observer 接口
-DebugHub.hpp              事件分发器
-DebugGUI.hpp              GUI 统一出口
-DebugKeyHandler.hpp       按键转换
-DebugTiming.hpp           耗时统计
-DebugPreprocess.hpp       预处理图层
-DebugLight.hpp            灯条图层
-DebugArmorMatch.hpp       装甲板匹配图层
-DebugClassification.hpp   数字分类图层
-DebugPose.hpp             位姿/坐标图层
-DebugRoiRecorder.hpp      ROI 录制
+DebugData.hpp                   阶段 debug 数据结构
+IDebugObserver.hpp              Observer 接口
+DebugHub.hpp                    事件分发器
+DebugGUI.hpp                    GUI 统一出口
+DebugKeyHandler.hpp             按键转换
+DebugLayerState.hpp             图层开关状态（线程安全）
+DebugLayerController.hpp        数字键切换图层
+DebugTiming.hpp                 耗时统计（无头模式也打印日志）
+DebugPoseMarkerPublisher.hpp    /armor_markers MarkerArray 发布
+DebugPreprocess.hpp             预处理图层
+DebugLight.hpp                  灯条图层
+DebugArmorMatch.hpp             装甲板匹配图层
+DebugClassification.hpp         数字分类图层
+DebugPose.hpp                   位姿/坐标图层
+DebugResult.hpp                 最终结果图层
+DebugRoiRecorder.hpp            ROI 录制
 ```
 
 新增功能使用 `Debug + 功能名`，例如：
@@ -42,7 +46,6 @@ DebugRoiRecorder.hpp      ROI 录制
 ```text
 DebugPnpError.hpp
 DebugRejectedArmor.hpp
-DebugYawSearch.hpp
 ```
 
 ## 新增 Observer 的步骤
@@ -52,22 +55,39 @@ DebugYawSearch.hpp
 3. 新增 `DebugXXX` 类，继承 `IDebugObserver`。
 4. 只重写自己关心的事件，其他事件保持默认空实现。
 5. 如果需要显示图像，把图像提交给 `DebugGUI`，不要直接调用 `cv::imshow`。
-6. 如果需要响应按键，实现 `onKey(const DebugKeyEvent & event)`。
-7. 在初始化 debug 时，根据配置参数决定是否注册到 `DebugHub`。
+6. 如果需要发布 ROS topic（如 MarkerArray），在构造时创建 publisher。
+7. 如果需要响应按键，实现 `onKey(const DebugKeyEvent & event)`。
+8. 在 `DetectorNode::initDebug()` 中注册到 `DebugHub`。
 
-示例：
+## Observer 分类
+
+### 非 GUI Observer（始终注册）
+
+不受 `debug.show` 控制，即使无头模式也工作：
+
+- **DebugTiming** — 阶段耗时统计，每 `debug.stats_interval` 帧打印平均用时日志
+- **DebugPoseMarkerPublisher** — `/armor_markers` MarkerArray 发布，受 `debug.pose` 图层控制
+
+### GUI Observer（仅 debug.show=true 时注册）
+
+需要 OpenCV 窗口，无头模式下不注册：
+
+- DebugPreprocessView, DebugLightView, DebugArmorMatchView
+- DebugClassificationView, DebugResultView
+- DebugLayerController（数字键切换）
+
+注册逻辑：
 
 ```cpp
-class DebugPnpErrorView : public IDebugObserver
-{
-public:
-    explicit DebugPnpErrorView(DebugGUI & gui);
+void DetectorNode::initDebug() {
+    // 非 GUI observer：始终注册
+    debug_hub_.addObserver(std::make_shared<debug::DebugTiming>(debug_config_.stats_interval));
+    debug_hub_.addObserver(std::make_shared<debug::DebugPoseMarkerPublisher>(*this, layer_state_));
 
-    void onPoseSolved(const DebugFrameContext & context, const PoseDebugData & data) override;
-
-private:
-    DebugGUI * gui_ = nullptr;
-};
+    // GUI observer：仅 debug.show=true 时注册
+    if (!debug_config_.show) return;
+    // ... 注册 GUI observers
+}
 ```
 
 ## 事件使用规范
@@ -85,75 +105,32 @@ onFrameEnd
 onKey
 ```
 
-事件粒度保持“阶段级”，不要在像素循环、轮廓循环等高频内层逻辑里大量发事件。
-
-适合用事件的内容：
-
-```text
-显示中间图
-绘制检测结果
-保存 ROI
-统计耗时
-记录 benchmark 数据
-显示拒绝原因
-```
-
-不适合用事件的内容：
-
-```text
-灯条几何判断
-PnP fallback
-yaw 优化方法选择
-会改变算法输出的逻辑
-```
-
-这些应留在算法代码或策略类中。
+事件粒度保持"阶段级"，不要在像素循环、轮廓循环等高频内层逻辑里发事件。
 
 ## 开关规范
 
 Debug 开关控制 Observer 是否注册，而不是在主流程中堆 `if debug_xxx`。
 
-推荐：
-
-```cpp
-if (config.debug.preprocess) {
-    debug_hub.addObserver(std::make_shared<DebugPreprocessView>(debug_gui));
-}
-```
-
-不推荐：
-
-```cpp
-if (debug_preprocess) {
-    drawPreprocessInMainFlow();
-}
-```
-
 配置结构：
 
 ```yaml
 debug:
-  show: true
+  show: true            # OpenCV GUI 开关（非 GUI observer 不受此控制）
   rosbag_control: true
   rosbag_player_node: "/rosbag2_player"
   preprocess: false
   lights: true
   armor_match: false
   classification: false
-  pose: false
+  pose: false           # 控制 /armor_markers 发布
   result: true
-  stats_interval: 50
+  stats_interval: 50    # 耗时统计打印间隔（帧数）
+
+playback:
+  mode: "realtime"      # "realtime" 或 "step"
+  max_frames: 0         # 0=不限制，>0 时处理指定帧数后退出
+  exit_on_complete: false
 ```
-
-## GUI 规范
-
-- 默认只使用 `debug_show` 一个窗口，各模块作为图层叠加显示。
-- 多个模块同时启用时，由配置或后续按键决定哪些图层参与绘制。
-- 只有 `DebugGUI` 负责 OpenCV 窗口生命周期。
-- Observer 需要显示图像时，提交窗口名、图像和缩放比例。
-- `cv::Mat` 是否 clone 遵守 `Conventions.md`，不要在 Observer 中随意长期持有共享 Mat。
-- GUI 显示元素、文字位置、颜色和绘制样式见 `DebugGUI.md`。
-- 需要无窗口运行时，通过 `DebugGUI::setEnabled(false)` 关闭所有显示。
 
 ## 按键规范
 
@@ -169,63 +146,45 @@ SAVE_ROI      保存 ROI（预留）
 TOGGLE_LAYER  切换图层显示（数字键 1-6）
 ```
 
-Observer 不直接读 `cv::waitKey`，只在 `onKey` 中响应语义动作。
-
 ## 图层切换
 
-数字键 1–5 切换对应 debug 图层的显示状态：
+数字键 1–6 切换对应 debug 图层的显示状态：
 
 | 按键 | 图层 | 说明 |
 |---|---|---|
-| 1 | preprocess | 预处理中间图（独立窗口 preprocess_debug） |
-| 2 | lights | 灯条检测结果（叠加到 debug_show） |
-| 3 | armor_match | 装甲板匹配（预留，当前只切状态） |
-| 4 | classification | 数字分类（预留，当前只切状态） |
-| 5 | pose | 位姿解算（预留，当前只切状态） |
+| 1 | preprocess | 预处理中间图 |
+| 2 | lights | 灯条检测结果 |
+| 3 | armor_match | 装甲板匹配 |
+| 4 | classification | 数字分类 |
+| 5 | pose | /armor_markers 发布开关 |
 | 6 | result | 最终识别装甲板 X 标记 |
 
 切换后输出日志，例如：`DEBUG layer lights: ON`
 
 ## Timing 行为
 
-- `timing` 不是图层——`debug.show=true` 时始终启用，无法通过数字键关闭。
-- 每帧在 `debug_show` 左上角绘制 `Process` 总耗时和各阶段耗时。
-- 每 `debug.stats_interval` 帧（默认 50）打印一次平均耗时日志。
+- `timing` 不是图层——始终注册，无法通过数字键关闭。
+- 无论 `debug.show` 是否启用，每 `debug.stats_interval` 帧都打印平均耗时日志。
+- 仅当 `debug.show=true` 且 `display_bgr` 非空时，才在 GUI 上绘制 `Process: ... ms`。
+- `auto_test.launch.py` 支持 `timing_interval` 参数覆盖 `debug.stats_interval`。
 
-## rosbag 控制规划
+## 播放控制
 
-当前阶段只写规范，不实现 rosbag 服务客户端。
+### realtime 模式
 
-未来可通过配置开启 DebugGUI 调用 rosbag2 服务：
+- rosbag 按时间正常播放
+- 按键 Space 暂停/继续，n 单步
 
-```text
-TogglePaused  暂停/继续
-PlayNext      播放下一条消息，仅 paused 状态下有效
-```
+### step 模式
 
-默认仍允许使用 `ros2 bag play` 终端键盘控制。自动化测试如需稳定控制回放，优先使用 rosbag2 服务而不是模拟终端按键。
+- 处理完一帧后再请求播放下一帧
+- 通过 `/rosbag2_player/play_next` service 控制
+- 使用 in-flight 状态机避免请求竞争
+- `auto_test.launch.py` 默认使用此模式
 
 ## 数据结构规范
 
 - 阶段 debug 数据统一放在 `DebugData.hpp`。
-- 数据结构只表达“该阶段产生了什么”，不要混入窗口布局细节。
+- 数据结构只表达"该阶段产生了什么"，不要混入窗口布局细节。
 - 拒绝原因使用枚举 `DebugRejectReason`，补充细节放到 `detail` 字符串。
 - 如果字段会影响算法结果，它不应该放在 debug 数据里。
-
-## 下一阶段目标
-
-基础 debug 设施稳定后，下一阶段优先设计多线程 GUI。该阶段需要重新讨论 `cv::Mat` 所有权、跨线程队列、窗口刷新频率和退出顺序。
-
-## 不要提前实现的内容
-
-当前阶段不要把下面内容塞进 debug 框架：
-
-```text
-Tracker / Planner overlay
-KeyFrameCache 跨 topic 聚合
-世界坐标同步
-ROS debug msg
-通用 EventBus 模板系统
-```
-
-等单包检测流程稳定后，再按需要扩展。

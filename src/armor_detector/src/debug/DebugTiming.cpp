@@ -52,29 +52,7 @@ namespace armor_detector::debug {
         last_frame_ms_ = std::chrono::duration<double, std::milli>(now - frame_start_).count();
         frame_time_sum_ms_ += last_frame_ms_;
 
-        // 绘制 timing 文字到 display_bgr
-        if (context.display_bgr.empty()) {
-            return;
-        }
-
-        auto drawText = [&](const std::string &text, int line_index) {
-            int y = 24 * line_index;
-            cv::putText(context.display_bgr,
-                        text,
-                        cv::Point(10, y),
-                        cv::FONT_HERSHEY_SIMPLEX,
-                        0.60,
-                        cv::Scalar(0, 165, 255),
-                        2,
-                        cv::LINE_AA);
-        };
-
-        // 只显示总耗时，各阶段耗时仅用于定期统计日志
-        std::ostringstream total_ss;
-        total_ss << std::fixed << std::setprecision(2) << last_frame_ms_;
-        drawText("Process: " + total_ss.str() + " ms", 1);
-
-        // 每 report_interval 帧打印平均耗时
+        // 每 report_interval 帧打印平均耗时（无论有无 GUI）
         if (frame_count_ > 0 && frame_count_ % report_interval_ == 0) {
             std::ostringstream marks_ss;
             for (const auto &[name, sum] : stage_time_sums_) {
@@ -94,6 +72,27 @@ namespace armor_detector::debug {
                 v = 0.0;
             }
         }
+
+        // GUI 绘制：仅 display_bgr 非空时
+        if (context.display_bgr.empty()) {
+            return;
+        }
+
+        auto drawText = [&](const std::string &text, int line_index) {
+            int y = 24 * line_index;
+            cv::putText(context.display_bgr,
+                        text,
+                        cv::Point(10, y),
+                        cv::FONT_HERSHEY_SIMPLEX,
+                        0.60,
+                        cv::Scalar(0, 165, 255),
+                        2,
+                        cv::LINE_AA);
+        };
+
+        std::ostringstream total_ss;
+        total_ss << std::fixed << std::setprecision(2) << last_frame_ms_;
+        drawText("Process: " + total_ss.str() + " ms", 1);
     }
 
 } // namespace armor_detector::debug

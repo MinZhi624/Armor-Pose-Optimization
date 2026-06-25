@@ -2,7 +2,9 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -15,7 +17,13 @@ def generate_launch_description():
 
     config = os.path.join(package_share, 'config', 'config.yaml')
 
+    use_foxglove = LaunchConfiguration('use_foxglove')
+    foxglove_port = LaunchConfiguration('foxglove_port')
+
     return LaunchDescription([
+        DeclareLaunchArgument('use_foxglove', default_value='true'),
+        DeclareLaunchArgument('foxglove_port', default_value='8765'),
+
         # 播放 rosbag
         ExecuteProcess(
             cmd=[
@@ -32,6 +40,14 @@ def generate_launch_description():
             executable='armor_detector_node',
             name='armor_detector_node_cpp',
             parameters=[config],
+            output='screen'
+        ),
+
+        # Foxglove bridge
+        ExecuteProcess(
+            condition=IfCondition(use_foxglove),
+            cmd=['ros2', 'run', 'foxglove_bridge', 'foxglove_bridge',
+                 '--ros-args', '-p', ['port:=', foxglove_port]],
             output='screen'
         ),
     ])

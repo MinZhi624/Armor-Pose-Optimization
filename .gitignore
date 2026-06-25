@@ -60,6 +60,7 @@ picture/
 Daily.md
 .cache/
 temp/
+
 # 视屏 
 *.avi
 *.mp4
