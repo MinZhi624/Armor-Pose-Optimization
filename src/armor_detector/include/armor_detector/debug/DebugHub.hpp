@@ -30,37 +30,37 @@ public:
     std::size_t observerCount() const { return observers_.size(); }
     bool empty() const { return observers_.empty(); }
 
-    void onFrameStart(const DebugFrameContext & context)
+    void onFrameStart(DebugFrameContext & context)
     {
         for (auto & observer : observers_) observer->onFrameStart(context);
     }
 
-    void onPreprocess(const DebugFrameContext & context, const PreprocessDebugData & data)
+    void onPreprocess(DebugFrameContext & context, const PreprocessDebugData & data)
     {
         for (auto & observer : observers_) observer->onPreprocess(context, data);
     }
 
-    void onLights(const DebugFrameContext & context, const LightDebugData & data)
+    void onLights(DebugFrameContext & context, const LightDebugData & data)
     {
         for (auto & observer : observers_) observer->onLights(context, data);
     }
 
-    void onArmorMatch(const DebugFrameContext & context, const ArmorMatchDebugData & data)
+    void onArmorMatch(DebugFrameContext & context, const ArmorMatchDebugData & data)
     {
         for (auto & observer : observers_) observer->onArmorMatch(context, data);
     }
 
-    void onClassification(const DebugFrameContext & context, const ClassificationDebugData & data)
+    void onClassification(DebugFrameContext & context, const ClassificationDebugData & data)
     {
         for (auto & observer : observers_) observer->onClassification(context, data);
     }
 
-    void onPoseSolved(const DebugFrameContext & context, const PoseDebugData & data)
+    void onPoseSolved(DebugFrameContext & context, const PoseDebugData & data)
     {
         for (auto & observer : observers_) observer->onPoseSolved(context, data);
     }
 
-    void onFrameEnd(const DebugFrameContext & context)
+    void onFrameEnd(DebugFrameContext & context)
     {
         for (auto & observer : observers_) observer->onFrameEnd(context);
     }

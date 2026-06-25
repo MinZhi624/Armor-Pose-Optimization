@@ -36,7 +36,7 @@ struct LightBar
     cv::Point2f center;
     cv::Point2f top;
     cv::Point2f bottom;
-    double angle_deg = 0.0;
+    double angle = 0.0;        // 弧度（原 angle_deg，改为弧度匹配参考项目）
     double length = 0.0;
     double width = 0.0;
     int area = 0;

@@ -27,6 +27,8 @@ add_executable(armor_detector_node
   src/debug/DebugGUI.cpp
   src/debug/DebugMsg.cpp
   src/debug/DebugKeyHandler.cpp
+  src/debug/DebugPreprocessView.cpp
+  src/debug/DebugLightView.cpp
 )
 
 target_include_directories(armor_detector_node PUBLIC

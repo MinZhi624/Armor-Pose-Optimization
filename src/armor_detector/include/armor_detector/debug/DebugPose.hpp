@@ -17,7 +17,7 @@ class DebugPoseView : public IDebugObserver
 public:
     explicit DebugPoseView(DebugGUI & gui);
 
-    void onPoseSolved(const DebugFrameContext & context, const PoseDebugData & data) override;
+    void onPoseSolved(DebugFrameContext & context, const PoseDebugData & data) override;
 
 private:
     DebugGUI * gui_ = nullptr;

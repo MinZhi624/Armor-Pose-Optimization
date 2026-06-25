@@ -17,7 +17,7 @@ class DebugClassificationView : public IDebugObserver
 public:
     explicit DebugClassificationView(DebugGUI & gui);
 
-    void onClassification(const DebugFrameContext & context, const ClassificationDebugData & data) override;
+    void onClassification(DebugFrameContext & context, const ClassificationDebugData & data) override;
 
 private:
     DebugGUI * gui_ = nullptr;

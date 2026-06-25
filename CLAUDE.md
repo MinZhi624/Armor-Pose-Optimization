@@ -67,7 +67,6 @@ ROS2: `rclcpp`, `sensor_msgs`, `cv_bridge`, `ament_index_cpp`
 - `docs/Conventions.md` — 单位、坐标系、cv::Mat 生命周期规则
 - `docs/DebugGUI.md` — GUI 注册和显示标准
 - `docs/Debug.md` — Debug 系统扩展指南
-- `docs/AlgorithmReference.md` — 算法文档模板
 
 ## QoS 注意事项
 

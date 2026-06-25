@@ -16,7 +16,7 @@ class DebugArmorMatchView : public IDebugObserver
 public:
     explicit DebugArmorMatchView(DebugGUI & gui);
 
-    void onArmorMatch(const DebugFrameContext & context, const ArmorMatchDebugData & data) override;
+    void onArmorMatch(DebugFrameContext & context, const ArmorMatchDebugData & data) override;
 
 private:
     DebugGUI * gui_ = nullptr;

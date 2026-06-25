@@ -19,13 +19,13 @@ class IDebugObserver
 public:
     virtual ~IDebugObserver() = default;
 
-    virtual void onFrameStart(const DebugFrameContext & context) {}
-    virtual void onPreprocess(const DebugFrameContext & context, const PreprocessDebugData & data) {}
-    virtual void onLights(const DebugFrameContext & context, const LightDebugData & data) {}
-    virtual void onArmorMatch(const DebugFrameContext & context, const ArmorMatchDebugData & data) {}
-    virtual void onClassification(const DebugFrameContext & context, const ClassificationDebugData & data) {}
-    virtual void onPoseSolved(const DebugFrameContext & context, const PoseDebugData & data) {}
-    virtual void onFrameEnd(const DebugFrameContext & context) {}
+    virtual void onFrameStart(DebugFrameContext & context) {}
+    virtual void onPreprocess(DebugFrameContext & context, const PreprocessDebugData & data) {}
+    virtual void onLights(DebugFrameContext & context, const LightDebugData & data) {}
+    virtual void onArmorMatch(DebugFrameContext & context, const ArmorMatchDebugData & data) {}
+    virtual void onClassification(DebugFrameContext & context, const ClassificationDebugData & data) {}
+    virtual void onPoseSolved(DebugFrameContext & context, const PoseDebugData & data) {}
+    virtual void onFrameEnd(DebugFrameContext & context) {}
     virtual void onKey(const DebugKeyEvent & event) {}
 };
 

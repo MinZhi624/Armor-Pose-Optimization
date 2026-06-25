@@ -13,6 +13,8 @@ def generate_launch_description():
         'armor_detector', 'Test', 'video', 'video1'
     )
 
+    config = os.path.join(package_share, 'config', 'config.yaml')
+
     return LaunchDescription([
         # 播放 rosbag
         ExecuteProcess(
@@ -29,6 +31,7 @@ def generate_launch_description():
             package='armor_detector',
             executable='armor_detector_node',
             name='armor_detector_node_cpp',
+            parameters=[config],
             output='screen'
         ),
     ])

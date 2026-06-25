@@ -23,6 +23,7 @@ struct DebugFrameContext
     std::size_t frame_index = 0;
     builtin_interfaces::msg::Time stamp;
     cv::Mat source_bgr;
+    cv::Mat display_bgr;       // 显示用图像（Observer 可在其上绘制叠加图层）
 };
 
 /**
@@ -34,6 +35,8 @@ enum class DebugKeyAction {
     PAUSE_TOGGLE,
     SAVE_ROI,
     STEP_FRAME,
+    PLAYBACK_RATE_UP,
+    PLAYBACK_RATE_DOWN,
 };
 
 struct DebugKeyEvent
@@ -57,7 +60,7 @@ struct StageTiming
 struct PreprocessDebugData
 {
     cv::Mat gray;
-    cv::Mat binary;
+    cv::Mat img_thre;
     cv::Mat color_mask;
 };
 

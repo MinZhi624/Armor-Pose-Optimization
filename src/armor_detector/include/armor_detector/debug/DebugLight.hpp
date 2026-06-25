@@ -17,7 +17,7 @@ class DebugLightView : public IDebugObserver
 public:
     explicit DebugLightView(DebugGUI & gui);
 
-    void onLights(const DebugFrameContext & context, const LightDebugData & data) override;
+    void onLights(DebugFrameContext & context, const LightDebugData & data) override;
 
 private:
     DebugGUI * gui_ = nullptr;

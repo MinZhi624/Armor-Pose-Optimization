@@ -16,7 +16,7 @@ class DebugPreprocessView : public IDebugObserver
 public:
     explicit DebugPreprocessView(DebugGUI & gui);
 
-    void onPreprocess(const DebugFrameContext & context, const PreprocessDebugData & data) override;
+    void onPreprocess(DebugFrameContext & context, const PreprocessDebugData & data) override;
 
 private:
     DebugGUI * gui_ = nullptr;

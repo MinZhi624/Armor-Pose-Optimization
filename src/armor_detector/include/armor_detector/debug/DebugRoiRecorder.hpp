@@ -20,7 +20,7 @@ class DebugRoiRecorder : public IDebugObserver
 public:
     explicit DebugRoiRecorder(std::filesystem::path output_dir);
 
-    void onClassification(const DebugFrameContext & context, const ClassificationDebugData & data) override;
+    void onClassification(DebugFrameContext & context, const ClassificationDebugData & data) override;
     void onKey(const DebugKeyEvent & event) override;
 
 private:

@@ -20,13 +20,13 @@ class DebugTiming : public IDebugObserver
 public:
     explicit DebugTiming(std::size_t report_interval = 50);
 
-    void onFrameStart(const DebugFrameContext & context) override;
-    void onPreprocess(const DebugFrameContext & context, const PreprocessDebugData & data) override;
-    void onLights(const DebugFrameContext & context, const LightDebugData & data) override;
-    void onArmorMatch(const DebugFrameContext & context, const ArmorMatchDebugData & data) override;
-    void onClassification(const DebugFrameContext & context, const ClassificationDebugData & data) override;
-    void onPoseSolved(const DebugFrameContext & context, const PoseDebugData & data) override;
-    void onFrameEnd(const DebugFrameContext & context) override;
+    void onFrameStart(DebugFrameContext & context) override;
+    void onPreprocess(DebugFrameContext & context, const PreprocessDebugData & data) override;
+    void onLights(DebugFrameContext & context, const LightDebugData & data) override;
+    void onArmorMatch(DebugFrameContext & context, const ArmorMatchDebugData & data) override;
+    void onClassification(DebugFrameContext & context, const ClassificationDebugData & data) override;
+    void onPoseSolved(DebugFrameContext & context, const PoseDebugData & data) override;
+    void onFrameEnd(DebugFrameContext & context) override;
 
 private:
     void mark(const std::string & stage_name);

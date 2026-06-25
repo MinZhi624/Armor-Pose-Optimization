@@ -24,6 +24,14 @@ DebugKeyEvent DebugKeyHandler::translate(int raw_key) const
     {
         action = DebugKeyAction::SAVE_ROI;
     }
+    else if (raw_key == '+' || raw_key == '=')
+    {
+        action = DebugKeyAction::PLAYBACK_RATE_UP;
+    }
+    else if (raw_key == '-' || raw_key == '_')
+    {
+        action = DebugKeyAction::PLAYBACK_RATE_DOWN;
+    }
 
     return {action, raw_key};
 }
