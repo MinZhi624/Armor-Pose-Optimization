@@ -144,3 +144,4 @@ BOTTOM_RIGHT  坐标、分类、PnP 等结果摘要
 | lights | point | light endpoints (top/bottom) | (255, 0, 255) | radius=1, filled | layer lights ON | 灯条端点标记 |
 | lights | rotated_rect | rejected light bar | (0, 0, 255) | thickness=2, LINE_AA | layer lights ON | 被拒绝的灯条 |
 | lights | text | reject reason detail | (0, 0, 255) | scale=0.60, thickness=2 | layer lights ON | 拒绝原因文字，偏移 +5px |
+| result | line | final classified armor X mark | (0, 255, 255) | thickness=1, LINE_AA | layer result ON | 最终识别装甲板 X 标记 |

@@ -2,75 +2,106 @@
 
 #include <opencv2/imgproc.hpp>
 
-namespace armor_detector::debug
-{
+namespace armor_detector::debug {
 
-DebugPreprocessView::DebugPreprocessView(DebugGUI & gui, DebugLayerState & layer_state)
-    : gui_(&gui), layer_state_(layer_state)
-{
-}
-
-void DebugPreprocessView::onPreprocess(
-    DebugFrameContext & context,
-    const PreprocessDebugData & data)
-{
-    if (!gui_ || !gui_->enabled()) return;
-
-    // 图层关闭：清理旧窗口后返回
-    if (!layer_state_.enabled(DebugLayer::PREPROCESS)) {
-        if (was_shown_) {
-            gui_->clearFrame("preprocess_debug");
-            was_shown_ = false;
-        }
-        return;
+    DebugPreprocessView::DebugPreprocessView(DebugGUI &gui, DebugLayerState &layer_state) :
+        gui_(&gui), layer_state_(layer_state) {
     }
 
-    if (context.source_bgr.empty()) return;
+    void DebugPreprocessView::onPreprocess(DebugFrameContext &context, const PreprocessDebugData &data) {
+        if (!gui_ || !gui_->enabled()) {
+            return;
+        }
 
-    was_shown_ = true;
+        // 图层关闭：清理旧窗口后返回
+        if (!layer_state_.enabled(DebugLayer::PREPROCESS)) {
+            if (was_shown_) {
+                gui_->clearFrame("preprocess_debug");
+                was_shown_ = false;
+            }
+            return;
+        }
 
-    // 原图 resize 0.5
-    cv::Mat src_half;
-    cv::resize(context.source_bgr, src_half, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
+        if (context.source_bgr.empty()) {
+            return;
+        }
 
-    // 三张单通道图转 BGR 后 resize 0.5
-    auto toHalfBgr = [](const cv::Mat & src) -> cv::Mat {
-        if (src.empty()) return {};
-        cv::Mat bgr, half;
-        cv::cvtColor(src, bgr, cv::COLOR_GRAY2BGR);
-        cv::resize(bgr, half, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
-        return half;
-    };
+        was_shown_ = true;
 
-    cv::Mat gray_half = toHalfBgr(data.gray);
-    cv::Mat binary_half = toHalfBgr(data.img_thre);
-    cv::Mat color_half = toHalfBgr(data.color_mask);
+        // 原图 resize 0.5
+        cv::Mat src_half;
+        cv::resize(context.source_bgr, src_half, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
 
-    // 空图用黑图替代，保证 2x2 网格尺寸一致
-    cv::Mat black = cv::Mat::zeros(src_half.size(), CV_8UC3);
-    if (gray_half.empty()) gray_half = black.clone();
-    if (binary_half.empty()) binary_half = black.clone();
-    if (color_half.empty()) color_half = black.clone();
+        // 三张单通道图转 BGR 后 resize 0.5
+        auto toHalfBgr = [](const cv::Mat &src) -> cv::Mat {
+            if (src.empty()) {
+                return cv::Mat();
+            }
+            cv::Mat bgr, half;
+            cv::cvtColor(src, bgr, cv::COLOR_GRAY2BGR);
+            cv::resize(bgr, half, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
+            return half;
+        };
 
-    // 2x2 网格: [source | gray] [binary | color_mask]
-    cv::Mat top, bottom, combined;
-    cv::hconcat(src_half, gray_half, top);
-    cv::hconcat(binary_half, color_half, bottom);
-    cv::vconcat(top, bottom, combined);
+        cv::Mat gray_half = toHalfBgr(data.gray);
+        cv::Mat binary_half = toHalfBgr(data.img_thre);
+        cv::Mat color_half = toHalfBgr(data.color_mask);
 
-    // 文字标注
-    int w = src_half.cols;
-    int h = src_half.rows;
-    cv::putText(combined, "source", cv::Point(10, 24),
-                cv::FONT_HERSHEY_SIMPLEX, 0.60, cv::Scalar(0, 165, 255), 2, cv::LINE_AA);
-    cv::putText(combined, "gray", cv::Point(w + 10, 24),
-                cv::FONT_HERSHEY_SIMPLEX, 0.60, cv::Scalar(0, 165, 255), 2, cv::LINE_AA);
-    cv::putText(combined, "binary", cv::Point(10, h + 24),
-                cv::FONT_HERSHEY_SIMPLEX, 0.60, cv::Scalar(0, 165, 255), 2, cv::LINE_AA);
-    cv::putText(combined, "color_mask", cv::Point(w + 10, h + 24),
-                cv::FONT_HERSHEY_SIMPLEX, 0.60, cv::Scalar(0, 165, 255), 2, cv::LINE_AA);
+        // 空图用黑图替代，保证 2x2 网格尺寸一致
+        cv::Mat black = cv::Mat::zeros(src_half.size(), CV_8UC3);
+        if (gray_half.empty()) {
+            gray_half = black.clone();
+        }
+        if (binary_half.empty()) {
+            binary_half = black.clone();
+        }
+        if (color_half.empty()) {
+            color_half = black.clone();
+        }
 
-    gui_->setFrame("preprocess_debug", combined);
-}
+        // 2x2 网格: [source | gray] [binary | color_mask]
+        cv::Mat top, bottom, combined;
+        cv::hconcat(src_half, gray_half, top);
+        cv::hconcat(binary_half, color_half, bottom);
+        cv::vconcat(top, bottom, combined);
+
+        // 文字标注
+        int w = src_half.cols;
+        int h = src_half.rows;
+        cv::putText(combined,
+                    "source",
+                    cv::Point(10, 24),
+                    cv::FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    cv::Scalar(0, 165, 255),
+                    2,
+                    cv::LINE_AA);
+        cv::putText(combined,
+                    "gray",
+                    cv::Point(w + 10, 24),
+                    cv::FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    cv::Scalar(0, 165, 255),
+                    2,
+                    cv::LINE_AA);
+        cv::putText(combined,
+                    "binary",
+                    cv::Point(10, h + 24),
+                    cv::FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    cv::Scalar(0, 165, 255),
+                    2,
+                    cv::LINE_AA);
+        cv::putText(combined,
+                    "color_mask",
+                    cv::Point(w + 10, h + 24),
+                    cv::FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    cv::Scalar(0, 165, 255),
+                    2,
+                    cv::LINE_AA);
+
+        gui_->setFrame("preprocess_debug", combined);
+    }
 
 } // namespace armor_detector::debug

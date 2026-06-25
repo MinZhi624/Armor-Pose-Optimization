@@ -141,6 +141,7 @@ debug:
   armor_match: false
   classification: false
   pose: false
+  result: true
   stats_interval: 50
 ```
 
@@ -165,7 +166,7 @@ EXIT          退出节点 / 关闭窗口
 PAUSE_TOGGLE  rosbag 暂停/继续
 STEP_FRAME    rosbag 单步
 SAVE_ROI      保存 ROI（预留）
-TOGGLE_LAYER  切换图层显示（数字键 1-5）
+TOGGLE_LAYER  切换图层显示（数字键 1-6）
 ```
 
 Observer 不直接读 `cv::waitKey`，只在 `onKey` 中响应语义动作。
@@ -181,6 +182,7 @@ Observer 不直接读 `cv::waitKey`，只在 `onKey` 中响应语义动作。
 | 3 | armor_match | 装甲板匹配（预留，当前只切状态） |
 | 4 | classification | 数字分类（预留，当前只切状态） |
 | 5 | pose | 位姿解算（预留，当前只切状态） |
+| 6 | result | 最终识别装甲板 X 标记 |
 
 切换后输出日志，例如：`DEBUG layer lights: ON`
 

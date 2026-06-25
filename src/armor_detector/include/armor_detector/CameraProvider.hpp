@@ -14,18 +14,16 @@
 #error "cv_bridge header not found. Install ros-<distro>-cv-bridge."
 #endif
 
-namespace armor_detector
-{
+namespace armor_detector {
 
-class CameraProvider
-{
-private:
-    CameraInfo camera_info_;
+    class CameraProvider {
+    private:
+        CameraInfo camera_info_;
 
-public:
-    void init();  // 从 yaml 加载相机参数
-    Frame receiveImage(const sensor_msgs::msg::Image::SharedPtr & msg);
-    CameraInfo getCameraInfo();
-};
+    public:
+        void init(); // 从 yaml 加载相机参数
+        Frame receiveImage(const sensor_msgs::msg::Image::SharedPtr &msg);
+        CameraInfo getCameraInfo();
+    };
 
 } // namespace armor_detector

@@ -24,11 +24,15 @@ add_executable(armor_detector_node
   src/CameraProvider.cpp
   src/PoseSolver.cpp
   src/detector/LightDetector.cpp
+  src/NumberClassifier.cpp
   src/debug/DebugGUI.cpp
   src/debug/DebugMsg.cpp
   src/debug/DebugKeyHandler.cpp
   src/debug/DebugPreprocessView.cpp
   src/debug/DebugLightView.cpp
+  src/debug/DebugArmorMatchView.cpp
+  src/debug/DebugClassificationView.cpp
+  src/debug/DebugResultView.cpp
   src/debug/DebugTiming.cpp
   src/debug/DebugLayerController.cpp
 )
@@ -56,6 +60,7 @@ install(TARGETS armor_detector_node
 install(DIRECTORY
   launch
   config
+  model
   DESTINATION share/${PROJECT_NAME}
 )
 
