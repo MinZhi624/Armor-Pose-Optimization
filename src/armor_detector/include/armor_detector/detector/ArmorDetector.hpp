@@ -1,7 +1,6 @@
 #pragma once
 
 #include "armor_detector/debug/DebugData.hpp"
-#include "armor_detector/tools/angle.hpp"
 #include "armor_detector/types/ArmorData.hpp"
 
 #include <opencv2/core.hpp>

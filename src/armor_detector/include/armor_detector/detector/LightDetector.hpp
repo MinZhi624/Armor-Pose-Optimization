@@ -1,6 +1,7 @@
 #pragma once
 
 #include "armor_detector/debug/DebugData.hpp"
+#include "armor_detector/detector/LightBarCorrector.hpp"
 #include "armor_detector/types/ArmorData.hpp"
 
 #include <opencv2/core.hpp>
@@ -27,14 +28,14 @@ namespace armor_detector {
     private:
         bool checkLightGeometry(const std::vector<cv::Point> &contour) const;
 
-        LightBarColor findLightColor(const cv::Mat &img_bgr,
-                                     const cv::RotatedRect &rect,
-                                     const std::vector<cv::Point> &contour) const;
+        static LightBarColor findLightColor(const cv::Mat &img_bgr,
+                                           const cv::RotatedRect &rect,
+                                           const std::vector<cv::Point> &contour);
 
-        LightBar
-        createLight(const cv::RotatedRect &ellipse_rect, const cv::RotatedRect &min_rect, LightBarColor color) const;
+        static void createLightBar(LightBar &light, const std::vector<cv::Point> &contour);
 
         Params params_;
+        LightBarCorrector corrector_;
         debug::LightDebugData light_debug_;
     };
 

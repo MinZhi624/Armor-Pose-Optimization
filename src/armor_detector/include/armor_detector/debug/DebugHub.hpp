@@ -1,5 +1,6 @@
 #pragma once
 
+#include "armor_detector/debug/DetectionDebugData.hpp"
 #include "armor_detector/debug/IDebugObserver.hpp"
 
 #include <cstddef>
@@ -66,6 +67,12 @@ namespace armor_detector::debug {
         void onPoseSolved(DebugFrameContext &context, const PoseDebugData &data) {
             for (auto &observer : observers_) {
                 observer->onPoseSolved(context, data);
+            }
+        }
+
+        void onDetection(DebugFrameContext &context, const debug::DetectionDebugData &data) {
+            for (auto &obs : observers_) {
+                obs->onDetection(context, data);
             }
         }
 

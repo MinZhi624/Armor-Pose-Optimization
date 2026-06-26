@@ -1,6 +1,6 @@
 #pragma once
 
-#include "armor_detector/debug/DebugData.hpp"
+#include "armor_detector/debug/DetectionDebugData.hpp"
 
 namespace armor_detector::debug {
 
@@ -28,6 +28,8 @@ namespace armor_detector::debug {
         virtual void onClassification(DebugFrameContext &context, const ClassificationDebugData &data) {
         }
         virtual void onPoseSolved(DebugFrameContext &context, const PoseDebugData &data) {
+        }
+        virtual void onDetection(DebugFrameContext &context, const debug::DetectionDebugData &data) {
         }
         virtual void onFrameEnd(DebugFrameContext &context) {
         }

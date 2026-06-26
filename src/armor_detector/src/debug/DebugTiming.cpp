@@ -8,72 +8,102 @@
 
 namespace armor_detector::debug {
 
+    namespace {
+        const char *backendName(DetectionBackend backend) {
+            return backend == DetectionBackend::YOLO ? "yolo" : "traditional";
+        }
+    } // namespace
+
     DebugTiming::DebugTiming(std::size_t report_interval) :
-        report_interval_(report_interval > 0 ? report_interval : 50) {
+        stats_interval_(report_interval > 0 ? report_interval : 50) {
     }
 
     void DebugTiming::onFrameStart(DebugFrameContext & /*context*/) {
-        ++frame_count_;
         frame_start_ = std::chrono::steady_clock::now();
-        last_mark_ = frame_start_;
-        last_stage_ms_.clear();
+        ++total_frame_count_;
     }
 
-    void DebugTiming::mark(const std::string &stage_name) {
-        auto now = std::chrono::steady_clock::now();
-        double dt_ms = std::chrono::duration<double, std::milli>(now - last_mark_).count();
-        stage_time_sums_[stage_name] += dt_ms;
-        last_stage_ms_.emplace_back(stage_name, dt_ms);
-        last_mark_ = now;
-    }
+    void DebugTiming::onDetection(DebugFrameContext & /*context*/, const DetectionDebugData &data) {
+        for (const auto &timing : data.timings) {
+            stage_accum_[timing.name] += timing.elapsed_ms;
+            stage_count_[timing.name] += 1;
+        }
 
-    void DebugTiming::onPreprocess(DebugFrameContext & /*context*/, const PreprocessDebugData & /*data*/) {
-        mark("preprocess");
-    }
+        ++detected_frame_count_;
+        ++detection_window_count_;
 
-    void DebugTiming::onLights(DebugFrameContext & /*context*/, const LightDebugData & /*data*/) {
-        mark("lights");
-    }
+        // 记录 detect 结束时间（供 onPoseSolved 计算 pose 耗时）
+        detect_end_ = std::chrono::steady_clock::now();
 
-    void DebugTiming::onArmorMatch(DebugFrameContext & /*context*/, const ArmorMatchDebugData & /*data*/) {
-        mark("armor_match");
-    }
+        if (detection_window_count_ < stats_interval_) {
+            return;
+        }
 
-    void DebugTiming::onClassification(DebugFrameContext & /*context*/, const ClassificationDebugData & /*data*/) {
-        mark("classification");
+        // 检测总耗时
+        double detect_total_avg = 0.0;
+        auto total_sum = stage_accum_.find("detect_total");
+        auto total_count = stage_count_.find("detect_total");
+        if (total_sum != stage_accum_.end() && total_count != stage_count_.end() && total_count->second > 0) {
+            detect_total_avg = total_sum->second / static_cast<double>(total_count->second);
+        }
+
+        // 帧总耗时
+        double frame_avg = (frame_window_count_ > 0)
+            ? frame_time_sum_ms_ / static_cast<double>(frame_window_count_)
+            : 0.0;
+
+        // 构建单行输出
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(2);
+        ss << "[" << backendName(data.backend) << "] 最近" << detection_window_count_ << "帧: ";
+        ss << "[total:" << frame_avg << "ms] [";
+        ss << "detect:" << detect_total_avg << "ms [";
+
+        bool first = true;
+        for (const auto &[name, total] : stage_accum_) {
+            if (name == "detect_total") continue;
+            auto count_it = stage_count_.find(name);
+            if (count_it == stage_count_.end() || count_it->second == 0) continue;
+            if (!first) ss << ", ";
+            ss << name << ":" << (total / static_cast<double>(count_it->second)) << "ms";
+            first = false;
+        }
+
+        ss << "]";
+
+        if (pose_count_ > 0) {
+            ss << ", pose:" << (pose_accum_ / static_cast<double>(pose_count_)) << "ms";
+        }
+
+        ss << "]";
+        RCLCPP_INFO(rclcpp::get_logger("DebugTiming"), "%s", ss.str().c_str());
+
+        // 重置
+        stage_accum_.clear();
+        stage_count_.clear();
+        detection_window_count_ = 0;
+        pose_accum_ = 0.0;
+        pose_count_ = 0;
     }
 
     void DebugTiming::onPoseSolved(DebugFrameContext & /*context*/, const PoseDebugData & /*data*/) {
-        mark("pose");
+        auto now = std::chrono::steady_clock::now();
+        double pose_ms = std::chrono::duration<double, std::milli>(now - detect_end_).count();
+        pose_accum_ += pose_ms;
+        ++pose_count_;
     }
 
     void DebugTiming::onFrameEnd(DebugFrameContext &context) {
         auto now = std::chrono::steady_clock::now();
-        last_frame_ms_ = std::chrono::duration<double, std::milli>(now - frame_start_).count();
-        frame_time_sum_ms_ += last_frame_ms_;
+        double last_frame_ms = std::chrono::duration<double, std::milli>(now - frame_start_).count();
+        frame_time_sum_ms_ += last_frame_ms;
+        ++frame_window_count_;
 
-        // 每 report_interval 帧打印平均耗时（无论有无 GUI）
-        if (frame_count_ > 0 && frame_count_ % report_interval_ == 0) {
-            std::ostringstream marks_ss;
-            for (const auto &[name, sum] : stage_time_sums_) {
-                double avg = sum / static_cast<double>(report_interval_);
-                marks_ss << name << ":" << std::fixed << std::setprecision(1) << avg << "ms ";
-            }
-            std::string marks_str = marks_ss.str();
-            if (!marks_str.empty()) {
-                marks_str.pop_back();
-            }
-
-            double avg_total = frame_time_sum_ms_ / static_cast<double>(report_interval_);
-            RCLCPP_INFO(rclcpp::get_logger("DEBUG_TIMING"), "【平均用时】总:%.1fms [%s]", avg_total, marks_str.c_str());
-
+        if (frame_window_count_ >= stats_interval_) {
             frame_time_sum_ms_ = 0.0;
-            for (auto &[k, v] : stage_time_sums_) {
-                v = 0.0;
-            }
+            frame_window_count_ = 0;
         }
 
-        // GUI 绘制：仅 display_bgr 非空时
         if (context.display_bgr.empty()) {
             return;
         }
@@ -91,7 +121,7 @@ namespace armor_detector::debug {
         };
 
         std::ostringstream total_ss;
-        total_ss << std::fixed << std::setprecision(2) << last_frame_ms_;
+        total_ss << std::fixed << std::setprecision(2) << last_frame_ms;
         drawText("Process: " + total_ss.str() + " ms", 1);
     }
 

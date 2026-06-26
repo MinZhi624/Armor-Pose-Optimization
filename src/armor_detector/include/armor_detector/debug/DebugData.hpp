@@ -32,10 +32,10 @@ namespace armor_detector::debug {
      */
     enum class DebugLayer {
         UNKNOWN,
-        PREPROCESS,
-        LIGHTS,
-        ARMOR_MATCH,
-        CLASSIFICATION,
+        DETECT_STAGE_1,  // traditional: preprocess; yolo: letterbox input
+        DETECT_STAGE_2,  // traditional: lights; yolo: raw candidates after score threshold
+        DETECT_STAGE_3,  // traditional: armor match; yolo: NMS/filter result
+        DETECT_STAGE_4,  // traditional: classification; yolo: final detections
         POSE,
         RESULT,
     };

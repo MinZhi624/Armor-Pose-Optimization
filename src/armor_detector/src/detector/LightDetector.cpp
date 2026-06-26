@@ -1,5 +1,4 @@
 #include "armor_detector/detector/LightDetector.hpp"
-#include "armor_detector/tools/angle.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -31,7 +30,6 @@ namespace armor_detector {
             }
 
             cv::RotatedRect min_rect = cv::minAreaRect(cv::Mat(contour));
-            cv::RotatedRect ellipse_rect = cv::fitEllipse(contour);
             LightBarColor color = findLightColor(img_bgr, min_rect, contour);
 
             if (color == LightBarColor::NONE) {
@@ -44,7 +42,10 @@ namespace armor_detector {
                 continue;
             }
 
-            LightBar light = createLight(ellipse_rect, min_rect, color);
+            LightBar light;
+            light.color = color;
+            createLightBar(light, contour);
+            // corrector_.lightbarPointsCorrect(light, contour);
             light.id = static_cast<int>(lights.size());
             lights.push_back(light);
             light_debug_.accepted_lights.push_back(light);
@@ -75,7 +76,7 @@ namespace armor_detector {
 
     LightBarColor LightDetector::findLightColor(const cv::Mat &img_bgr,
                                                 const cv::RotatedRect &rect,
-                                                const std::vector<cv::Point> &contour) const {
+                                                const std::vector<cv::Point> &contour) {
         cv::Rect bbox = rect.boundingRect();
         bbox &= cv::Rect(0, 0, img_bgr.cols, img_bgr.rows);
         if (bbox.empty()) {
@@ -111,43 +112,47 @@ namespace armor_detector {
         return LightBarColor::NONE;
     }
 
-    LightBar LightDetector::createLight(const cv::RotatedRect &ellipse_rect,
-                                        const cv::RotatedRect &min_rect,
-                                        LightBarColor color) const {
-        LightBar light;
-        light.rect = ellipse_rect;
-        light.color = color;
-
-        // 用椭圆角度计算方向，用 minAreaRect 尺寸约束端点
+    void LightDetector::createLightBar(LightBar &light, const std::vector<cv::Point> &contour) {
+        cv::RotatedRect min_rect = cv::minAreaRect(contour);
+        light.rect = min_rect;
         light.center = min_rect.center;
-        double angle_rad = tools::degToRad(ellipse_rect.angle + 90);
-        cv::Point2f dir = cv::Point2f(std::cos(angle_rad), std::sin(angle_rad));
+        light.length = std::max(min_rect.size.width, min_rect.size.height);
+        light.width = std::min(min_rect.size.width, min_rect.size.height);
+        light.area = static_cast<int>(min_rect.size.width * min_rect.size.height);
 
-        // 确保方向一致性
-        if (std::abs(dir.y) > 0.8f) {
-            if (dir.y > 0) {
-                dir = -dir;
+        // 从顶点推导长轴方向，避免 minAreaRect.angle 的跳变问题
+        cv::Point2f vertices[4];
+        min_rect.points(vertices);
+
+        // 找最长边
+        double max_edge_len = 0;
+        cv::Point2f p1, p2;
+        for (int i = 0; i < 4; ++i) {
+            int next = (i + 1) % 4;
+            double edge_len = cv::norm(vertices[next] - vertices[i]);
+            if (edge_len > max_edge_len) {
+                max_edge_len = edge_len;
+                p1 = vertices[i];
+                p2 = vertices[next];
             }
         }
-        else if (dir.x < 0) {
+
+        // 长轴方向：确保 top 在上（y 更小），bottom 在下（y 更大）
+        cv::Point2f dir = p2 - p1;
+        if (p1.y > p2.y) {
             dir = -dir;
         }
 
         double len = cv::norm(dir);
         if (len < 1e-6) {
-            return light;
+            return;
         }
         dir = dir / len;
 
-        double half_len = std::max(min_rect.size.width, min_rect.size.height) / 2;
-        light.top = light.center + dir * half_len;
-        light.bottom = light.center - dir * half_len;
+        double half_len = light.length / 2;
+        light.top = light.center - dir * half_len;
+        light.bottom = light.center + dir * half_len;
         light.angle = std::atan2(dir.y, dir.x);
-        light.length = half_len * 2.0;
-        light.width = std::min(min_rect.size.width, min_rect.size.height);
-        light.area = static_cast<int>(min_rect.size.width * min_rect.size.height);
-
-        return light;
     }
 
 } // namespace armor_detector

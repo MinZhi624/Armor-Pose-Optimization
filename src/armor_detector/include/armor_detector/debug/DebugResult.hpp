@@ -2,6 +2,7 @@
 
 #include "armor_detector/debug/DebugGUI.hpp"
 #include "armor_detector/debug/DebugLayerState.hpp"
+#include "armor_detector/debug/DetectionDebugData.hpp"
 #include "armor_detector/debug/IDebugObserver.hpp"
 
 namespace armor_detector::debug {
@@ -9,8 +10,7 @@ namespace armor_detector::debug {
 class DebugResultView : public IDebugObserver {
 public:
     DebugResultView(DebugGUI &gui, DebugLayerState &layer_state);
-    void onClassification(DebugFrameContext &context,
-                          const ClassificationDebugData &data) override;
+    void onDetection(DebugFrameContext &context, const DetectionDebugData &data) override;
 
 private:
     DebugGUI *gui_ = nullptr;

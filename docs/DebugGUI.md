@@ -140,11 +140,28 @@ BOTTOM_RIGHT  坐标、分类、PnP 等结果摘要
 
 | 图层 | 元素 | 内容 | 颜色(BGR) | 样式 | 显示条件 | 说明 |
 |---|---|---|---|---|---|---|
-| lights | rotated_rect | accepted light bar | (0, 255, 0) | thickness=2, LINE_AA | layer lights ON | 已通过筛选的灯条 |
-| lights | point | light endpoints (top/bottom) | (255, 0, 255) | radius=1, filled | layer lights ON | 灯条端点标记 |
-| lights | rotated_rect | rejected light bar | (0, 0, 255) | thickness=2, LINE_AA | layer lights ON | 被拒绝的灯条 |
-| lights | text | reject reason detail | (0, 0, 255) | scale=0.60, thickness=2 | layer lights ON | 拒绝原因文字，偏移 +5px |
+| lights | rotated_rect | accepted light bar | (0, 255, 0) | thickness=2, LINE_AA | layer DETECT_STAGE_2 ON + traditional | 已通过筛选的灯条 |
+| lights | point | light endpoints (top/bottom) | (255, 0, 255) | radius=1, filled | layer DETECT_STAGE_2 ON + traditional | 灯条端点标记 |
+| lights | rotated_rect | rejected light bar | (0, 0, 255) | thickness=2, LINE_AA | layer DETECT_STAGE_2 ON + traditional | 被拒绝的灯条 |
+| lights | text | reject reason detail | (0, 0, 255) | scale=0.60, thickness=2 | layer DETECT_STAGE_2 ON + traditional | 拒绝原因文字，偏移 +5px |
+| yolo | polygon | score-filtered candidates | (0, 255, 255) | thickness=2, LINE_AA | layer DETECT_STAGE_2 ON + yolo | score 阈值后的候选框 |
+| yolo | polygon | NMS kept candidates | (0, 255, 0) | thickness=2, LINE_AA | layer DETECT_STAGE_3 ON + yolo | NMS 保留的候选 |
+| yolo | polygon | NMS rejected | (128, 128, 128) | thickness=1, LINE_AA | layer DETECT_STAGE_3 ON + yolo | NMS 抑制的候选 |
+| yolo | polygon | class/color filtered | (0, 0, 255) / (255, 0, 0) | thickness=1, LINE_AA | layer DETECT_STAGE_3 ON + yolo | 红=不支持类别，蓝=颜色不匹配 |
+| yolo | polygon | low confidence filtered | (0, 165, 255) | thickness=1, LINE_AA | layer DETECT_STAGE_3 ON + yolo | 橙色=低置信度 |
+| yolo | polygon + text | final detections | (255, 0, 255) | thickness=2, LINE_AA | layer DETECT_STAGE_4 ON + yolo | 最终检测框 + 名称/置信度 |
 | result | line | final classified armor X mark | (255, 0, 255) | thickness=1, LINE_AA | layer result ON | 最终识别装甲板 X 标记，紫色 |
+
+## yolo_stage1_letterbox - Draw
+
+YOLO 后端 Stage 1 独立窗口，显示 letterbox 输入图：
+
+| 元素 | 内容 | 颜色(BGR) | 样式 | 显示条件 | 说明 |
+|---|---|---|---|---|---|
+| image | source_roi | — | resize to letterbox size | layer DETECT_STAGE_1 ON + yolo + use_roi | 源图 ROI 裁剪 |
+| image | letterbox | — | 640×640 | layer DETECT_STAGE_1 ON + yolo | letterbox 预处理结果 |
+| text | "source_roi" | (0, 165, 255) | scale=0.60, thickness=2 | 同上 | 左侧标注 |
+| text | "letterbox" | (0, 165, 255) | scale=0.60, thickness=2 | 同上 | 右侧标注 |
 
 ## /armor_markers (Foxglove/RViz)
 

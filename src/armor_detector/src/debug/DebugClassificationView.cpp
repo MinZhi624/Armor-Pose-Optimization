@@ -10,12 +10,13 @@ namespace armor_detector::debug {
         gui_(&gui), layer_state_(layer_state) {
     }
 
-    void DebugClassificationView::onClassification(DebugFrameContext &context, const ClassificationDebugData &data) {
-        if (!gui_ || !gui_->enabled()) {
-            return;
-        }
+    void DebugClassificationView::onDetection(DebugFrameContext &context, const DetectionDebugData &data) {
+        if (data.backend != DetectionBackend::TRADITIONAL) return;
+        if (!gui_ || !gui_->enabled()) return;
 
-        if (!layer_state_.enabled(DebugLayer::CLASSIFICATION)) {
+        const auto &classification = data.traditional.classification;
+
+        if (!layer_state_.enabled(DebugLayer::DETECT_STAGE_4)) {
             gui_->clearFrame("number_rois");
             return;
         }
@@ -27,7 +28,7 @@ namespace armor_detector::debug {
         cv::Mat &display = context.display_bgr;
 
         // Draw classification labels on display image
-        for (const auto &armor : data.classified_armors) {
+        for (const auto &armor : classification.classified_armors) {
             const auto &corners = armor.geometry.corners;
             cv::Point2f center = (corners[0] + corners[1] + corners[2] + corners[3]) / 4.0f;
 
@@ -45,14 +46,14 @@ namespace armor_detector::debug {
         }
 
         // Concatenate number ROIs into a single window
-        if (data.number_rois.empty()) {
+        if (classification.number_rois.empty()) {
             gui_->clearFrame("number_rois");
             return;
         }
 
         // Convert all ROIs to BGR for consistent hconcat
         std::vector<cv::Mat> bgr_rois;
-        for (const auto &roi : data.number_rois) {
+        for (const auto &roi : classification.number_rois) {
             cv::Mat bgr;
             if (roi.channels() == 1) {
                 cv::cvtColor(roi, bgr, cv::COLOR_GRAY2BGR);

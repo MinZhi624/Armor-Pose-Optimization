@@ -12,18 +12,18 @@ namespace armor_detector::yaw {
     constexpr double kLocalRangeRad = tools::degToRad(3.0);
     constexpr int kTernaryIterations = 8;
 
-    double runYawSearch(double center_yaw, const YawErrorFunction &calculate_error) {
+    double enumerate(double center_yaw, const YawErrorFunction &calculate_error,
+                     double search_range_rad, double step_rad) {
         using tools::normalizeRadAngle;
 
-        // Phase 1: Coarse enumeration
-        const double start_yaw = center_yaw - kSearchRangeRad;
-        const int steps = static_cast<int>(2.0 * kSearchRangeRad / kEnumerateStepRad);
+        const double start_yaw = center_yaw - search_range_rad;
+        const int steps = static_cast<int>(2.0 * search_range_rad / step_rad);
 
         double best_yaw = center_yaw;
         double min_error = std::numeric_limits<double>::infinity();
 
         for (int i = 0; i <= steps; ++i) {
-            const double yaw = normalizeRadAngle(start_yaw + static_cast<double>(i) * kEnumerateStepRad);
+            const double yaw = normalizeRadAngle(start_yaw + static_cast<double>(i) * step_rad);
             const double error = calculate_error(yaw);
             if (error < min_error) {
                 min_error = error;
@@ -31,11 +31,17 @@ namespace armor_detector::yaw {
             }
         }
 
-        // Phase 2: Local ternary search
-        double l = best_yaw - kLocalRangeRad;
-        double r = best_yaw + kLocalRangeRad;
+        return best_yaw;
+    }
 
-        for (int iter = 0; iter < kTernaryIterations; ++iter) {
+    double ternary(double initial_yaw, const YawErrorFunction &calculate_error,
+                   double local_range_rad, int iterations) {
+        using tools::normalizeRadAngle;
+
+        double l = initial_yaw - local_range_rad;
+        double r = initial_yaw + local_range_rad;
+
+        for (int iter = 0; iter < iterations; ++iter) {
             const double m1 = l + (r - l) / 3.0;
             const double m2 = r - (r - l) / 3.0;
             const double e1 = calculate_error(normalizeRadAngle(m1));
@@ -50,6 +56,13 @@ namespace armor_detector::yaw {
         }
 
         return normalizeRadAngle((l + r) / 2.0);
+    }
+
+    double runYawSearch(double center_yaw, const YawErrorFunction &calculate_error) {
+        const double coarse_yaw = enumerate(center_yaw, calculate_error,
+                                            kSearchRangeRad, kEnumerateStepRad);
+        return ternary(coarse_yaw, calculate_error,
+                       kLocalRangeRad, kTernaryIterations);
     }
 
 } // namespace armor_detector::yaw

@@ -2,6 +2,7 @@
 
 #include "armor_detector/debug/DebugGUI.hpp"
 #include "armor_detector/debug/DebugLayerState.hpp"
+#include "armor_detector/debug/DetectionDebugData.hpp"
 #include "armor_detector/debug/IDebugObserver.hpp"
 
 namespace armor_detector::debug {
@@ -16,7 +17,7 @@ namespace armor_detector::debug {
     public:
         DebugLightView(DebugGUI &gui, DebugLayerState &layer_state);
 
-        void onLights(DebugFrameContext &context, const LightDebugData &data) override;
+        void onDetection(DebugFrameContext &context, const DetectionDebugData &data) override;
 
     private:
         DebugGUI *gui_ = nullptr;

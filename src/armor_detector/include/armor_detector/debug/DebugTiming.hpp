@@ -1,46 +1,47 @@
 #pragma once
 
+#include "armor_detector/debug/DetectionDebugData.hpp"
 #include "armor_detector/debug/IDebugObserver.hpp"
 
 #include <chrono>
 #include <cstddef>
 #include <map>
 #include <string>
-#include <utility>
-#include <vector>
 
 namespace armor_detector::debug {
 
     /**
      * @brief 阶段耗时统计 Observer。
      *
-     * 第一版建议只统计帧总耗时和每个阶段的平均耗时，不参与算法结果。
+     * 通过 onDetection 收集各阶段耗时，定期打印平均值。
+     * onFrameStart / onFrameEnd 用于统计总帧时间。
      */
     class DebugTiming : public IDebugObserver {
     public:
         explicit DebugTiming(std::size_t report_interval = 50);
 
         void onFrameStart(DebugFrameContext &context) override;
-        void onPreprocess(DebugFrameContext &context, const PreprocessDebugData &data) override;
-        void onLights(DebugFrameContext &context, const LightDebugData &data) override;
-        void onArmorMatch(DebugFrameContext &context, const ArmorMatchDebugData &data) override;
-        void onClassification(DebugFrameContext &context, const ClassificationDebugData &data) override;
+        void onDetection(DebugFrameContext &context, const DetectionDebugData &data) override;
         void onPoseSolved(DebugFrameContext &context, const PoseDebugData &data) override;
         void onFrameEnd(DebugFrameContext &context) override;
 
     private:
-        void mark(const std::string &stage_name);
-
-        std::size_t report_interval_ = 50;
-        std::size_t frame_count_ = 0;
+        std::size_t stats_interval_ = 50;
+        std::size_t detected_frame_count_ = 0;
+        std::size_t detection_window_count_ = 0;
         std::chrono::steady_clock::time_point frame_start_;
-        std::chrono::steady_clock::time_point last_mark_;
-        std::map<std::string, double> stage_time_sums_;
+
+        std::map<std::string, double> stage_accum_;
+        std::map<std::string, std::size_t> stage_count_;
+
+        std::size_t total_frame_count_ = 0;
+        std::size_t frame_window_count_ = 0;
         double frame_time_sum_ms_ = 0.0;
 
-        // 当前帧的阶段耗时（用于 onFrameEnd 绘制文字）
-        double last_frame_ms_ = 0.0;
-        std::vector<std::pair<std::string, double>> last_stage_ms_;
+        // pose 计时
+        std::chrono::steady_clock::time_point detect_end_;
+        double pose_accum_ = 0.0;
+        std::size_t pose_count_ = 0;
     };
 
 } // namespace armor_detector::debug

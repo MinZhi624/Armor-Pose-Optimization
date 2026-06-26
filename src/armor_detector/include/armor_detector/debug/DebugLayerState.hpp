@@ -42,20 +42,13 @@ namespace armor_detector::debug {
          */
         static std::string name(DebugLayer layer) {
             switch (layer) {
-                case DebugLayer::PREPROCESS:
-                    return "preprocess";
-                case DebugLayer::LIGHTS:
-                    return "lights";
-                case DebugLayer::ARMOR_MATCH:
-                    return "armor_match";
-                case DebugLayer::CLASSIFICATION:
-                    return "classification";
-                case DebugLayer::POSE:
-                    return "pose";
-                case DebugLayer::RESULT:
-                    return "result";
-                default:
-                    return "unknown";
+                case DebugLayer::DETECT_STAGE_1:  return "DETECT_STAGE_1";
+                case DebugLayer::DETECT_STAGE_2:  return "DETECT_STAGE_2";
+                case DebugLayer::DETECT_STAGE_3:  return "DETECT_STAGE_3";
+                case DebugLayer::DETECT_STAGE_4:  return "DETECT_STAGE_4";
+                case DebugLayer::POSE:            return "POSE";
+                case DebugLayer::RESULT:          return "RESULT";
+                default:                          return "UNKNOWN";
             }
         }
 

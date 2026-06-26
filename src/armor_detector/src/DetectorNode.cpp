@@ -6,6 +6,7 @@
 #include "armor_detector/debug/DebugPreprocess.hpp"
 #include "armor_detector/debug/DebugResult.hpp"
 #include "armor_detector/debug/DebugTiming.hpp"
+#include "armor_detector/debug/DebugYolo.hpp"
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
@@ -14,10 +15,8 @@
 
 namespace armor_detector {
 
-    DetectorNode::DetectorNode() :
-        Node("armor_detector_node_cpp"), detector_(Detector::Params{}), light_detector_(LightDetector::Params{}) {
+    DetectorNode::DetectorNode() : Node("armor_detector_node_cpp") {
         initParameters();
-        initDetectors();
         camera_provider_.init();
         pose_solver_.init(camera_provider_.getCameraInfo());
 
@@ -53,10 +52,10 @@ namespace armor_detector {
         debug_config_.rosbag_control = this->declare_parameter<bool>("debug.rosbag_control", true);
         debug_config_.rosbag_player_node =
             this->declare_parameter<std::string>("debug.rosbag_player_node", "/rosbag2_player");
-        debug_config_.preprocess = this->declare_parameter<bool>("debug.preprocess", false);
-        debug_config_.lights = this->declare_parameter<bool>("debug.lights", true);
-        debug_config_.armor_match = this->declare_parameter<bool>("debug.armor_match", false);
-        debug_config_.classification = this->declare_parameter<bool>("debug.classification", false);
+        debug_config_.detect_stage_1 = this->declare_parameter<bool>("debug.detect_stage_1", false);
+        debug_config_.detect_stage_2 = this->declare_parameter<bool>("debug.detect_stage_2", false);
+        debug_config_.detect_stage_3 = this->declare_parameter<bool>("debug.detect_stage_3", false);
+        debug_config_.detect_stage_4 = this->declare_parameter<bool>("debug.detect_stage_4", false);
         debug_config_.pose = this->declare_parameter<bool>("debug.pose", false);
         debug_config_.result = this->declare_parameter<bool>("debug.result", true);
         debug_config_.stats_interval =
@@ -67,51 +66,112 @@ namespace armor_detector {
         step_playback_ = (playback_mode == "step");
         max_frames_ = static_cast<std::size_t>(this->declare_parameter<int>("playback.max_frames", 0));
         exit_on_complete_ = this->declare_parameter<bool>("playback.exit_on_complete", false);
-    }
 
-    void DetectorNode::initDetectors() {
-        std::string target_color_str = this->declare_parameter<std::string>("target_color", "BLUE");
+        // --- Backend selection ---
+        declare_parameter("detector.backend", "traditional");
+        declare_parameter("detector.target_color", "RED");
+        std::string backend_str;
+        std::string target_color_str;
+        get_parameter("detector.backend", backend_str);
+        get_parameter("detector.target_color", target_color_str);
         LightBarColor target_color = (target_color_str == "RED") ? LightBarColor::RED : LightBarColor::BLUE;
 
-        Detector::Params det_params;
-        det_params.gray_threshold = this->declare_parameter<int>("gray_threshold", 100);
-        det_params.color_threshold = this->declare_parameter<int>("color_threshold", 100);
-        det_params.target_color = target_color;
-        detector_ = Detector(det_params);
-
-        LightDetector::Params light_params;
-        light_params.min_contours_area = this->declare_parameter<int>("min_contours_area", 30);
-        light_params.min_contours_ratio =
-            static_cast<float>(this->declare_parameter<double>("min_contours_ratio", 0.06));
-        light_params.max_contours_ratio =
-            static_cast<float>(this->declare_parameter<double>("max_contours_ratio", 0.5));
-        light_detector_ = LightDetector(light_params);
-
-        ArmorDetector::Params armor_params;
-        armor_params.max_angle_diff = this->declare_parameter<double>("max_angle_diff", 15.0);
-        armor_params.min_length_ratio = this->declare_parameter<double>("min_length_ratio", 0.7);
-        armor_params.min_x_diff_ratio = this->declare_parameter<double>("min_x_diff_ratio", 0.75);
-        armor_params.max_y_diff_ratio = this->declare_parameter<double>("max_y_diff_ratio", 1.0);
-        armor_params.max_distance_ratio = this->declare_parameter<double>("max_distance_ratio", 0.8);
-        armor_params.min_distance_ratio = this->declare_parameter<double>("min_distance_ratio", 0.1);
-        armor_params.target_color = target_color;
-        armor_detector_ = ArmorDetector(armor_params);
-
-        NumberClassifier::Params number_params;
-        std::string model_relative_path = this->declare_parameter<std::string>("model_path", "model/number_cnn.onnx");
         auto package_share = ament_index_cpp::get_package_share_directory("armor_detector");
-        number_params.model_path = package_share + "/" + model_relative_path;
-        number_params.confidence_threshold =
-            static_cast<float>(this->declare_parameter<double>("number_threshold", 0.5));
-        number_classifier_ = NumberClassifier(number_params);
+
+        Detector::Params detector_params;
+        detector_params.target_color = target_color;
+
+        if (backend_str == "traditional") {
+            detector_params.backend_type = DetectionBackend::TRADITIONAL;
+
+            declare_parameter("detector.traditional.preprocess.gray_threshold", 100);
+            declare_parameter("detector.traditional.preprocess.color_threshold", 100);
+            declare_parameter("detector.traditional.light.min_contours_area", 30);
+            declare_parameter("detector.traditional.light.min_contours_ratio", 0.06);
+            declare_parameter("detector.traditional.light.max_contours_ratio", 0.5);
+            declare_parameter("detector.traditional.armor.max_angle_diff", 15.0);
+            declare_parameter("detector.traditional.armor.min_length_ratio", 0.7);
+            declare_parameter("detector.traditional.armor.min_x_diff_ratio", 0.75);
+            declare_parameter("detector.traditional.armor.max_y_diff_ratio", 1.0);
+            declare_parameter("detector.traditional.armor.max_distance_ratio", 0.8);
+            declare_parameter("detector.traditional.armor.min_distance_ratio", 0.1);
+            declare_parameter("detector.traditional.number.model_path", "model/number_cnn.onnx");
+            declare_parameter("detector.traditional.number.threshold", 0.5);
+
+            get_parameter("detector.traditional.preprocess.gray_threshold",
+                          detector_params.traditional.preprocess.gray_threshold);
+            get_parameter("detector.traditional.preprocess.color_threshold",
+                          detector_params.traditional.preprocess.color_threshold);
+            get_parameter("detector.traditional.light.min_contours_area",
+                          detector_params.traditional.light.min_contours_area);
+            get_parameter("detector.traditional.light.min_contours_ratio",
+                          detector_params.traditional.light.min_contours_ratio);
+            get_parameter("detector.traditional.light.max_contours_ratio",
+                          detector_params.traditional.light.max_contours_ratio);
+            get_parameter("detector.traditional.armor.max_angle_diff",
+                          detector_params.traditional.armor.max_angle_diff);
+            get_parameter("detector.traditional.armor.min_length_ratio",
+                          detector_params.traditional.armor.min_length_ratio);
+            get_parameter("detector.traditional.armor.min_x_diff_ratio",
+                          detector_params.traditional.armor.min_x_diff_ratio);
+            get_parameter("detector.traditional.armor.max_y_diff_ratio",
+                          detector_params.traditional.armor.max_y_diff_ratio);
+            get_parameter("detector.traditional.armor.max_distance_ratio",
+                          detector_params.traditional.armor.max_distance_ratio);
+            get_parameter("detector.traditional.armor.min_distance_ratio",
+                          detector_params.traditional.armor.min_distance_ratio);
+            std::string num_model_relative;
+            get_parameter("detector.traditional.number.model_path", num_model_relative);
+            detector_params.traditional.number.model_path = package_share + "/" + num_model_relative;
+            float num_threshold;
+            get_parameter("detector.traditional.number.threshold", num_threshold);
+            detector_params.traditional.number.threshold = num_threshold;
+        }
+        else if (backend_str == "yolo") {
+            detector_params.backend_type = DetectionBackend::YOLO;
+
+            declare_parameter("detector.yolo.model_path", "model/robot_0526.onnx");
+            declare_parameter("detector.yolo.device", "CPU");
+            declare_parameter("detector.yolo.input_size", 640);
+            declare_parameter("detector.yolo.score_threshold", 0.65);
+            declare_parameter("detector.yolo.nms_threshold", 0.45);
+            declare_parameter("detector.yolo.min_confidence", 0.65);
+            declare_parameter("detector.yolo.max_raw_candidates", 100);
+            declare_parameter("detector.yolo.use_roi", false);
+            declare_parameter("detector.yolo.roi.x", 0);
+            declare_parameter("detector.yolo.roi.y", 0);
+            declare_parameter("detector.yolo.roi.width", -1);
+            declare_parameter("detector.yolo.roi.height", -1);
+
+            std::string yolo_model_relative;
+            get_parameter("detector.yolo.model_path", yolo_model_relative);
+            detector_params.yolo.model_path = package_share + "/" + yolo_model_relative;
+            get_parameter("detector.yolo.device", detector_params.yolo.device);
+            get_parameter("detector.yolo.input_size", detector_params.yolo.input_size);
+            get_parameter("detector.yolo.score_threshold", detector_params.yolo.score_threshold);
+            get_parameter("detector.yolo.nms_threshold", detector_params.yolo.nms_threshold);
+            get_parameter("detector.yolo.min_confidence", detector_params.yolo.min_confidence);
+            get_parameter("detector.yolo.max_raw_candidates", detector_params.yolo.max_raw_candidates);
+            get_parameter("detector.yolo.use_roi", detector_params.yolo.use_roi);
+            get_parameter("detector.yolo.roi.x", detector_params.yolo.roi_x);
+            get_parameter("detector.yolo.roi.y", detector_params.yolo.roi_y);
+            get_parameter("detector.yolo.roi.width", detector_params.yolo.roi_width);
+            get_parameter("detector.yolo.roi.height", detector_params.yolo.roi_height);
+        }
+        else {
+            throw std::runtime_error("Unknown detector backend: " + backend_str);
+        }
+
+        detector_ = std::make_unique<Detector>(detector_params);
+        RCLCPP_INFO(get_logger(), "Detector backend: %s", backend_str.c_str());
     }
 
     void DetectorNode::initDebug() {
         // 初始化图层状态（从 config 读取初始值）
-        layer_state_.setEnabled(debug::DebugLayer::PREPROCESS, debug_config_.preprocess);
-        layer_state_.setEnabled(debug::DebugLayer::LIGHTS, debug_config_.lights);
-        layer_state_.setEnabled(debug::DebugLayer::ARMOR_MATCH, debug_config_.armor_match);
-        layer_state_.setEnabled(debug::DebugLayer::CLASSIFICATION, debug_config_.classification);
+        layer_state_.setEnabled(debug::DebugLayer::DETECT_STAGE_1, debug_config_.detect_stage_1);
+        layer_state_.setEnabled(debug::DebugLayer::DETECT_STAGE_2, debug_config_.detect_stage_2);
+        layer_state_.setEnabled(debug::DebugLayer::DETECT_STAGE_3, debug_config_.detect_stage_3);
+        layer_state_.setEnabled(debug::DebugLayer::DETECT_STAGE_4, debug_config_.detect_stage_4);
         layer_state_.setEnabled(debug::DebugLayer::POSE, debug_config_.pose);
         layer_state_.setEnabled(debug::DebugLayer::RESULT, debug_config_.result);
 
@@ -133,6 +193,7 @@ namespace armor_detector {
         debug_hub_.addObserver(std::make_shared<debug::DebugArmorMatchView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugResultView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugClassificationView>(debug_gui_, layer_state_));
+        debug_hub_.addObserver(std::make_shared<debug::DebugYoloView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugLayerController>(layer_state_));
 
         debug_key_timer_ = this->create_wall_timer(std::chrono::milliseconds(15), [this]() { pollDebugKeys(); });
@@ -169,18 +230,11 @@ namespace armor_detector {
 
         debug_hub_.onFrameStart(ctx);
 
-        cv::Mat img_thre = detector_.preprocess(frame.image);
-        debug_hub_.onPreprocess(ctx, detector_.getPreprocessDebugData());
+        // Unified detection via backend
+        DetectionResult result = detector_->detect(frame.image);
+        debug_hub_.onDetection(ctx, result.debug);
 
-        auto lights = light_detector_.findLights(img_thre, frame.image);
-        debug_hub_.onLights(ctx, light_detector_.getLightDebugData());
-
-        auto candidates = armor_detector_.match(lights);
-        debug_hub_.onArmorMatch(ctx, armor_detector_.getArmorMatchDebugData());
-
-        auto classified = number_classifier_.classify(candidates, frame.image);
-        debug_hub_.onClassification(ctx, number_classifier_.getClassificationDebugData());
-        auto solved = pose_solver_.solve(classified);
+        auto solved = pose_solver_.solve(result.armors);
         debug_hub_.onPoseSolved(ctx, pose_solver_.getPoseDebugData());
 
         debug_hub_.onFrameEnd(ctx);

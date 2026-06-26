@@ -1,16 +1,13 @@
 #pragma once
 
 #include "armor_detector/CameraProvider.hpp"
-#include "armor_detector/NumberClassifier.hpp"
 #include "armor_detector/PoseSolver.hpp"
 #include "armor_detector/debug/DebugData.hpp"
 #include "armor_detector/debug/DebugGUI.hpp"
 #include "armor_detector/debug/DebugHub.hpp"
 #include "armor_detector/debug/DebugLayerState.hpp"
 #include "armor_detector/debug/DebugPoseMarkerPublisher.hpp"
-#include "armor_detector/detector/ArmorDetector.hpp"
 #include "armor_detector/detector/Detector.hpp"
-#include "armor_detector/detector/LightDetector.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <rosbag2_interfaces/srv/play_next.hpp>
@@ -18,6 +15,7 @@
 #include <rosbag2_interfaces/srv/toggle_paused.hpp>
 
 #include <cstddef>
+#include <memory>
 #include <string>
 
 namespace armor_detector {
@@ -29,10 +27,10 @@ namespace armor_detector {
         bool show = true;
         bool rosbag_control = true;
         std::string rosbag_player_node = "/rosbag2_player";
-        bool preprocess = false;
-        bool lights = true;
-        bool armor_match = false;
-        bool classification = false;
+        bool detect_stage_1 = false;
+        bool detect_stage_2 = false;
+        bool detect_stage_3 = false;
+        bool detect_stage_4 = false;
         bool pose = false;
         bool result = true;
         std::size_t stats_interval = 50;
@@ -51,7 +49,6 @@ namespace armor_detector {
 
     private:
         void initParameters();
-        void initDetectors();
         void initDebug();
         void initRosbagClients();
 
@@ -61,10 +58,6 @@ namespace armor_detector {
 
         // 检测组件
         CameraProvider camera_provider_;
-        Detector detector_;
-        LightDetector light_detector_;
-        ArmorDetector armor_detector_;
-        NumberClassifier number_classifier_;
         PoseSolver pose_solver_;
 
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
@@ -93,6 +86,8 @@ namespace armor_detector {
         rclcpp::TimerBase::SharedPtr play_next_timer_;
 
         std::size_t frame_index_ = 0;
+
+        std::unique_ptr<Detector> detector_;
     };
 
 } // namespace armor_detector

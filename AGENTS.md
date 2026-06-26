@@ -7,6 +7,7 @@ This repository contains one ROS 2 package, `armor_detector`, for RoboMaster arm
 - `src/armor_detector/include/armor_detector/`: public headers, organized by component (`detector/`, `debug/`, `types/`, `tools/`, `yaw/`).
 - `src/armor_detector/src/`: C++ implementations for the node, camera provider, detector pipeline, pose solver, yaw search, and debug UI.
 - `src/armor_detector/config/`: runtime YAML configuration, including camera calibration and playback settings.
+- `src/armor_detector/model/`: ONNX/IR model files (yolo, number_cnn, robot_0526).
 - `src/armor_detector/launch/`: ROS 2 launch files — `video1.launch.py` (interactive) and `auto_test.launch.py` (headless).
 - `src/armor_detector/Test/video/`: rosbag-based test data (`video1` through `video5`).
 - `docs/`: design notes and data conventions. Follow `docs/Conventions.md` for units, coordinate frames, corner ordering, and `cv::Mat` lifetime rules.
@@ -18,6 +19,7 @@ Build output directories (`build/`, `install/`, `log/`) are generated and should
 Run commands from the repository root:
 
 ```bash
+source /home/minzhi/intel/openvino_2026.1.0/setupvars.sh  # YOLO 后端需要
 colcon build --packages-select armor_detector
 source install/setup.bash
 
