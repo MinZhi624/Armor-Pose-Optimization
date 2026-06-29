@@ -8,8 +8,8 @@ This repository contains one ROS 2 package, `armor_detector`, for RoboMaster arm
 - `src/armor_detector/src/`: C++ implementations for the node, camera provider, detector pipeline, pose solver, yaw search, and debug UI.
 - `src/armor_detector/config/`: runtime YAML configuration, including camera calibration and playback settings.
 - `src/armor_detector/model/`: ONNX/IR model files (yolo, number_cnn, robot_0526).
-- `src/armor_detector/launch/`: ROS 2 launch files — `video1.launch.py` (interactive) and `auto_test.launch.py` (headless).
-- `src/armor_detector/Test/video/`: rosbag-based test data (`video1` through `video5`).
+- `src/armor_detector/launch/`: ROS 2 launch files — `run.launch.py` (interactive, realtime playback) and `auto_test.launch.py` (headless, step playback).
+- `src/armor_detector/Test/video/`: rosbag-based test data (`video1` through `video7`).
 - `docs/`: design notes and data conventions. Follow `docs/Conventions.md` for units, coordinate frames, corner ordering, and `cv::Mat` lifetime rules.
 
 Build output directories (`build/`, `install/`, `log/`) are generated and should not be edited manually.
@@ -23,8 +23,8 @@ source /home/minzhi/intel/openvino_2026.1.0/setupvars.sh  # YOLO 后端需要
 colcon build --packages-select armor_detector
 source install/setup.bash
 
-# 交互模式
-ros2 launch armor_detector video1.launch.py
+# 交互模式（支持 video:=video2 切换视频）
+ros2 launch armor_detector run.launch.py
 
 # 自动测试
 ros2 launch armor_detector auto_test.launch.py frame_count:=150

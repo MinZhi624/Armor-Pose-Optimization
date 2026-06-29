@@ -29,10 +29,12 @@ source install/setup.bash
 ### 交互模式（带 GUI + Foxglove）
 
 ```bash
-ros2 launch armor_detector video1.launch.py
+ros2 launch armor_detector run.launch.py video:=video1
 ```
 
 启动 rosbag 循环播放 + 检测节点 + Foxglove bridge。按 ESC 退出 OpenCV 窗口。
+
+切换视频：`ros2 launch armor_detector run.launch.py video:=video2`
 
 Foxglove 连接 `ws://localhost:8765`，查看 `/armor_markers` topic。
 
@@ -41,7 +43,7 @@ Foxglove 连接 `ws://localhost:8765`，查看 `/armor_markers` topic。
 ### 自动测试（无头 step 模式）
 
 ```bash
-ros2 launch armor_detector auto_test.launch.py frame_count:=150
+ros2 launch armor_detector auto_test.launch.py video:=video1 frame_count:=150
 ```
 
 逐帧播放 rosbag，处理 150 帧后自动退出。可加 `timing_interval:=1` 每帧打印用时。
@@ -88,13 +90,13 @@ src/armor_detector/
     types/                   # 数据结构定义
     yaw/                     # yaw 搜索算法
   launch/
-    video1.launch.py         # 交互模式 launch
+    run.launch.py            # 交互模式 launch（支持 video:= 参数切换视频）
     auto_test.launch.py      # 无头自动测试 launch
   model/                     # ONNX/IR 模型文件
   src/
     debug/                   # Debug observer 实现
     detector/                # 检测算法实现
     yaw/                     # yaw 搜索实现
-  Test/video/                # 测试用 rosbag 数据 (video1~video5)
+  Test/video/                # 测试用 rosbag 数据 (video1~video7)
 docs/                        # 设计文档和约定
 ```

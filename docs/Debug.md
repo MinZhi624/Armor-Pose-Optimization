@@ -44,6 +44,7 @@ DebugLight.hpp                  灯条图层（仅 traditional）
 DebugArmorMatch.hpp             装甲板匹配图层（仅 traditional）
 DebugClassification.hpp         数字分类图层（仅 traditional）
 DebugYolo.hpp                   YOLO 检测图层（仅 yolo）
+DebugCornerCorrection.hpp       角点修正对比图层
 DebugPose.hpp                   位姿/坐标图层
 DebugResult.hpp                 最终结果图层
 DebugRoiRecorder.hpp            ROI 录制
@@ -136,7 +137,8 @@ debug:
   detect_stage_2: false   # traditional: 灯条; yolo: score 阈值候选
   detect_stage_3: false   # traditional: 装甲板匹配; yolo: NMS/过滤结果
   detect_stage_4: false   # traditional: 数字分类; yolo: 最终检测
-  pose: false             # 控制 /armor_markers 发布
+  corner_correction: false # 角点修正对比（原始→修正）
+  pose: true              # 控制 /armor_markers 发布
   result: true            # 最终结果显示
   stats_interval: 50      # 耗时统计打印间隔（帧数）
 

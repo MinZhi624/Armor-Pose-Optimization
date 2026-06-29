@@ -9,14 +9,14 @@ source /home/minzhi/intel/openvino_2026.1.0/setupvars.sh  # YOLO 后端需要
 colcon build --packages-select armor_detector
 source install/setup.bash
 
-# 交互模式（GUI + Foxglove）
-ros2 launch armor_detector video1.launch.py
+# 交互模式（支持 video:=video2 切换视频）
+ros2 launch armor_detector run.launch.py video:=video1
 
 # 自动测试（无头 step 模式）
-ros2 launch armor_detector auto_test.launch.py frame_count:=150 timing_interval:=1
+ros2 launch armor_detector auto_test.launch.py video:=video1 frame_count:=150 timing_interval:=1
 ```
 
-ROS2 bag 测试数据在 `src/armor_detector/Test/video/video1` ~ `video5`。
+ROS2 bag 测试数据在 `src/armor_detector/Test/video/video1` ~ `video7`。
 
 ## Code Style
 
@@ -79,8 +79,9 @@ Letterbox → OpenVINO 推理 → 解码(22列) → NMS → 类别/颜色过滤
 detector:
   backend: "yolo"     # yolo / traditional
   target_color: "RED"
-  traditional: { ... }  # 传统后端参数
-  yolo: { ... }       # YOLO 后端参数
+  corner_correction: { ... }  # 角点修正参数
+  traditional: { ... }        # 传统后端参数
+  yolo: { ... }               # YOLO 后端参数
 
 debug:
   show: true
@@ -88,7 +89,8 @@ debug:
   detect_stage_2: false  # traditional: 灯条; yolo: score 候选
   detect_stage_3: false  # traditional: 装甲板匹配; yolo: NMS/过滤
   detect_stage_4: false  # traditional: 数字分类; yolo: 最终检测
-  pose: false
+  corner_correction: false  # 角点修正对比
+  pose: true
   result: true
   stats_interval: 50
 ```
@@ -121,7 +123,7 @@ debug:
 
 ### 播放模式
 
-- **realtime** — rosbag 按时间正常播放（video1.launch.py 默认）
+- **realtime** — rosbag 按时间正常播放（run.launch.py 默认）
 - **step** — 处理完一帧后再请求播放下一帧（auto_test.launch.py 默认）
 
 参数：`playback.mode`、`playback.max_frames`、`playback.exit_on_complete`
