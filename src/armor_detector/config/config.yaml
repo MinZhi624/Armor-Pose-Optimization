@@ -20,11 +20,20 @@ armor_detector_node_cpp:
         roi_scale: 1.25
         # ROI 内二值化灰度阈值（0-255），越低越敏感
         gray_threshold: 100
-        # 修正后四角与原始四角的最大允许距离和（像素），超过则判定修正失败
+        # 修正后四角与原始四角的最大允许距离和（像素），超过则回退原始角点
         max_endpoint_distance_px: 15.0
+        # 装甲板末端几何合理性检查；不通过会从最终输出中过滤
+        geometry:
+          enabled: true
+          # 比传统灯条配对更宽松，用于兜底 YOLO 明显误检
+          max_angle_diff_deg: 15.0
+          min_length_ratio: 0.45
+          min_x_diff_ratio: 0.45
+          max_y_diff_ratio: 1.5
+          min_distance_ratio: 0.05
+          max_distance_ratio: 1.2
         # ROI 内灯条候选的几何筛选参数
         light:
-          # 轮廓最小面积（像素²）
           min_contours_area: 30
           # 灯条短边/长边比值范围（灯条应为细长形状）
           min_contours_ratio: 0.06
@@ -52,23 +61,14 @@ armor_detector_node_cpp:
 
       # --------------- YOLO 后端参数 ---------------
       yolo:
-        # 模型路径（相对于 install/share 目录）
         model_path: "model/robot_0526.onnx"
-        # 推理设备: "CPU" / "GPU" / "AUTO"
         device: "CPU"
-        # 模型输入尺寸（正方形，像素）
         input_size: 640
-        # 置信度阈值：低于此值的检测直接丢弃
         score_threshold: 0.65
-        # NMS IoU 阈值：重叠超过此值的检测框被抑制
         nms_threshold: 0.45
-        # 最终最低置信度：NMS 后低于此值的检测被过滤
         min_confidence: 0.65
-        # 解码后最多保留的原始候选数
         max_raw_candidates: 100
-        # 是否使用 ROI 裁剪输入（减少计算量）
         use_roi: false
-        # ROI 区域（use_roi=true 时生效，width/height=-1 表示全图）
         roi:
           x: 0
           y: 0
@@ -77,7 +77,7 @@ armor_detector_node_cpp:
 
     # ==================== Debug ====================
     debug:
-      # OpenCV GUI 开关（false=无头模式，不显示窗口）
+      # OpenCV GUI 开关（false=无头模式，不显示窗口）``
       show: true
       # 是否通过 ROS service 控制 rosbag 播放
       rosbag_control: true

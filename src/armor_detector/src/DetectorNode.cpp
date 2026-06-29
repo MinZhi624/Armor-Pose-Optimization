@@ -171,6 +171,13 @@ namespace armor_detector {
         declare_parameter("detector.corner_correction.roi_scale", 1.25);
         declare_parameter("detector.corner_correction.gray_threshold", 100);
         declare_parameter("detector.corner_correction.max_endpoint_distance_px", 15.0);
+        declare_parameter("detector.corner_correction.geometry.enabled", true);
+        declare_parameter("detector.corner_correction.geometry.max_angle_diff_deg", 30.0);
+        declare_parameter("detector.corner_correction.geometry.min_length_ratio", 0.45);
+        declare_parameter("detector.corner_correction.geometry.min_x_diff_ratio", 0.45);
+        declare_parameter("detector.corner_correction.geometry.max_y_diff_ratio", 1.5);
+        declare_parameter("detector.corner_correction.geometry.min_distance_ratio", 0.05);
+        declare_parameter("detector.corner_correction.geometry.max_distance_ratio", 1.2);
         declare_parameter("detector.corner_correction.light.min_contours_area", 30);
         declare_parameter("detector.corner_correction.light.min_contours_ratio", 0.06);
         declare_parameter("detector.corner_correction.light.max_contours_ratio", 0.5);
@@ -187,6 +194,24 @@ namespace armor_detector {
             double max_dist;
             get_parameter("detector.corner_correction.max_endpoint_distance_px", max_dist);
             detector_params.corner_correction.max_endpoint_distance_px = static_cast<float>(max_dist);
+        }
+        get_parameter("detector.corner_correction.geometry.enabled",
+                      detector_params.corner_correction.geometry.enabled);
+        {
+            double max_angle_diff_deg, min_length_ratio, min_x_diff_ratio, max_y_diff_ratio;
+            double min_distance_ratio, max_distance_ratio;
+            get_parameter("detector.corner_correction.geometry.max_angle_diff_deg", max_angle_diff_deg);
+            get_parameter("detector.corner_correction.geometry.min_length_ratio", min_length_ratio);
+            get_parameter("detector.corner_correction.geometry.min_x_diff_ratio", min_x_diff_ratio);
+            get_parameter("detector.corner_correction.geometry.max_y_diff_ratio", max_y_diff_ratio);
+            get_parameter("detector.corner_correction.geometry.min_distance_ratio", min_distance_ratio);
+            get_parameter("detector.corner_correction.geometry.max_distance_ratio", max_distance_ratio);
+            detector_params.corner_correction.geometry.max_angle_diff_deg = max_angle_diff_deg;
+            detector_params.corner_correction.geometry.min_length_ratio = min_length_ratio;
+            detector_params.corner_correction.geometry.min_x_diff_ratio = min_x_diff_ratio;
+            detector_params.corner_correction.geometry.max_y_diff_ratio = max_y_diff_ratio;
+            detector_params.corner_correction.geometry.min_distance_ratio = min_distance_ratio;
+            detector_params.corner_correction.geometry.max_distance_ratio = max_distance_ratio;
         }
         get_parameter("detector.corner_correction.light.min_contours_area",
                       detector_params.corner_correction.light.min_contours_area);

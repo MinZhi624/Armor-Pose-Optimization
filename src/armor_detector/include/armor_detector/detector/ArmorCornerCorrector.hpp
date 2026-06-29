@@ -15,6 +15,16 @@ namespace armor_detector {
         debug::CornerCorrectionDebugData debug;
     };
 
+    struct ArmorGeometryCheckParams {
+        bool enabled = true;
+        double max_angle_diff_deg = 30.0;
+        double min_length_ratio = 0.45;
+        double min_x_diff_ratio = 0.45;
+        double max_y_diff_ratio = 1.5;
+        double min_distance_ratio = 0.05;
+        double max_distance_ratio = 1.2;
+    };
+
     struct CornerCorrectionParams {
         bool enabled = true;
         std::string method = "fit_ellipse";
@@ -23,6 +33,7 @@ namespace armor_detector {
         float max_endpoint_distance_px = 15.0f;
         LightBarColor target_color = LightBarColor::BLUE;
         LightGeometryParams light;
+        ArmorGeometryCheckParams geometry;
     };
 
     class ArmorCornerCorrector {

@@ -85,6 +85,16 @@
 - 头文件：`include/armor_detector/detector/LightBarCorrector.hpp`
 - 实现文件：`src/detector/LightBarCorrector.cpp`
 
+### 角点修正末端几何合理性检查
+
+`ArmorCornerCorrector` 在后端输出之后、PnP 之前运行。灯条端点修正完成后，会用一组独立且更宽松的 `detector.corner_correction.geometry` 阈值检查左右灯条配对几何，用于兜底 YOLO 明显误检。检查项复用传统装甲板匹配的角度差、长度比、横向/纵向差异比和距离比概念，但不复用 `detector.traditional.armor` 参数。
+
+处理规则：
+
+- 修正成功且端点位移未超限：检查修正后的左右灯条。
+- 修正失败或端点位移超限：回退检查原始左右灯条。
+- 几何不通过：从最终输出中过滤，并在 corner correction debug 中记录 `geometry_reject:<detail>`。
+
 ## 装甲板匹配
 
 ### 参考来源
