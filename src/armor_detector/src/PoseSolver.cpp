@@ -42,7 +42,7 @@ namespace armor_detector {
 
     // ===================== 主流程 =====================
 
-    std::vector<SolvedArmor> PoseSolver::solve(const std::vector<ClassifiedArmor> &armors) {
+    std::vector<SolvedArmor> PoseSolver::solve(const std::vector<DetectedArmor> &armors) {
         std::unordered_map<int, std::vector<LastArmorYawRecord>> new_record;
         std::vector<SolvedArmor> solved_armors;
         solved_armors.reserve(armors.size());

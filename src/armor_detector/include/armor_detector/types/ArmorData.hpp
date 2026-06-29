@@ -9,7 +9,17 @@ namespace armor_detector {
 
     enum class ArmorType { SMALL, LARGE, NONE };
 
-    enum class ArmorName : int { ONE = 1, TWO = 2, THREE = 3, FOUR = 4, FIVE = 5, NONE = 0 };
+    enum class ArmorName : int {
+        NONE = 0,
+        ONE = 1,
+        TWO = 2,
+        THREE = 3,
+        FOUR = 4,
+        FIVE = 5,
+        SENTINEL = 6,  // 哨兵
+        OUTPOST = 7,   // 前哨站
+        BASE = 8       // 基地
+    };
 
     enum class LightBarColor { RED, BLUE, NONE };
 
@@ -60,7 +70,7 @@ namespace armor_detector {
         ArmorGeometry geometry;
     };
 
-    struct ClassifiedArmor {
+    struct DetectedArmor {
         ArmorGeometry geometry;
         ArmorClassification classification;
     };

@@ -31,6 +31,8 @@ namespace armor_detector::debug {
         }
         virtual void onDetection(DebugFrameContext &context, const debug::DetectionDebugData &data) {
         }
+        virtual void onCornerCorrection(DebugFrameContext &context, const CornerCorrectionDebugData &data) {
+        }
         virtual void onFrameEnd(DebugFrameContext &context) {
         }
         virtual void onKey(const DebugKeyEvent &event) {

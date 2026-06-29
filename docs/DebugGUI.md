@@ -150,6 +150,12 @@ BOTTOM_RIGHT  坐标、分类、PnP 等结果摘要
 | yolo | polygon | class/color filtered | (0, 0, 255) / (255, 0, 0) | thickness=1, LINE_AA | layer DETECT_STAGE_3 ON + yolo | 红=不支持类别，蓝=颜色不匹配 |
 | yolo | polygon | low confidence filtered | (0, 165, 255) | thickness=1, LINE_AA | layer DETECT_STAGE_3 ON + yolo | 橙色=低置信度 |
 | yolo | polygon + text | final detections | (255, 0, 255) | thickness=2, LINE_AA | layer DETECT_STAGE_4 ON + yolo | 最终检测框 + 名称/置信度 |
+| corner_correction | point | original corners (green) | (0, 255, 0) | radius=1, filled | layer CORNER_CORRECTION ON | 原始四角点 |
+| corner_correction | point | output corners (magenta) | (255, 0, 255) | radius=1, filled | layer CORNER_CORRECTION ON | 修正后四角点 |
+| corner_correction | line | original→output connection | (192, 192, 192) | thickness=1, LINE_AA | layer CORNER_CORRECTION ON | 原始到修正的连线 |
+| corner_correction | point | raw light endpoints | (255, 255, 0) | radius=1, filled | layer CORNER_CORRECTION ON + corrected | 原始灯条端点（青色） |
+| corner_correction | point | output light endpoints | (255, 0, 128) | radius=1, filled | layer CORNER_CORRECTION ON + corrected | 修正灯条端点（紫色） |
+| corner_correction | text | failure detail | (128, 128, 128) | scale=0.35, thickness=1 | layer CORNER_CORRECTION ON + failed | 失败原因文字 |
 | result | line | final classified armor X mark | (255, 0, 255) | thickness=1, LINE_AA | layer result ON | 最终识别装甲板 X 标记，紫色 |
 
 ## yolo_stage1_letterbox - Draw

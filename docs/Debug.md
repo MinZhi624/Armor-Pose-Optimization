@@ -107,6 +107,7 @@ void DetectorNode::initDebug() {
 onFrameStart       帧开始（设置 frame context）
 onDetection        统一检测结果（替代旧的 onPreprocess/onLights/onArmorMatch/onClassification）
 onPoseSolved       位姿解算完成
+onCornerCorrection 角点修正结果（6号图层）
 onFrameEnd         帧结束（绘制帧耗时、刷新 GUI）
 onKey              按键事件
 ```
@@ -170,7 +171,8 @@ TOGGLE_LAYER  切换图层显示（数字键 1-6）
 | 3 | DETECT_STAGE_3 | 装甲板匹配 | NMS/类别/颜色过滤结果 |
 | 4 | DETECT_STAGE_4 | 数字分类 | 最终检测结果 |
 | 5 | POSE | /armor_markers 发布开关 | 同左 |
-| 6 | RESULT | 最终识别装甲板 X 标记 | 同左 |
+| 6 | CORNER_CORRECTION | 角点修正对比 | 同左 |
+| 0 | RESULT | 最终识别装甲板 X 标记 | 同左 |
 
 切换后输出日志，例如：`DEBUG layer DETECT_STAGE_1: ON`
 

@@ -1,6 +1,7 @@
 #include "armor_detector/DetectorNode.hpp"
 #include "armor_detector/debug/DebugArmorMatch.hpp"
 #include "armor_detector/debug/DebugClassification.hpp"
+#include "armor_detector/debug/DebugCornerCorrection.hpp"
 #include "armor_detector/debug/DebugLayerController.hpp"
 #include "armor_detector/debug/DebugLight.hpp"
 #include "armor_detector/debug/DebugPreprocess.hpp"
@@ -56,6 +57,7 @@ namespace armor_detector {
         debug_config_.detect_stage_2 = this->declare_parameter<bool>("debug.detect_stage_2", false);
         debug_config_.detect_stage_3 = this->declare_parameter<bool>("debug.detect_stage_3", false);
         debug_config_.detect_stage_4 = this->declare_parameter<bool>("debug.detect_stage_4", false);
+        debug_config_.corner_correction = this->declare_parameter<bool>("debug.corner_correction", false);
         debug_config_.pose = this->declare_parameter<bool>("debug.pose", false);
         debug_config_.result = this->declare_parameter<bool>("debug.result", true);
         debug_config_.stats_interval =
@@ -80,6 +82,7 @@ namespace armor_detector {
 
         Detector::Params detector_params;
         detector_params.target_color = target_color;
+        detector_params.corner_correction.target_color = target_color;
 
         if (backend_str == "traditional") {
             detector_params.backend_type = DetectionBackend::TRADITIONAL;
@@ -162,6 +165,39 @@ namespace armor_detector {
             throw std::runtime_error("Unknown detector backend: " + backend_str);
         }
 
+        // Corner correction parameters
+        declare_parameter("detector.corner_correction.enabled", true);
+        declare_parameter("detector.corner_correction.method", "fit_ellipse");
+        declare_parameter("detector.corner_correction.roi_scale", 1.25);
+        declare_parameter("detector.corner_correction.gray_threshold", 100);
+        declare_parameter("detector.corner_correction.max_endpoint_distance_px", 15.0);
+        declare_parameter("detector.corner_correction.light.min_contours_area", 30);
+        declare_parameter("detector.corner_correction.light.min_contours_ratio", 0.06);
+        declare_parameter("detector.corner_correction.light.max_contours_ratio", 0.5);
+
+        get_parameter("detector.corner_correction.enabled", detector_params.corner_correction.enabled);
+        get_parameter("detector.corner_correction.method", detector_params.corner_correction.method);
+        {
+            double roi_scale;
+            get_parameter("detector.corner_correction.roi_scale", roi_scale);
+            detector_params.corner_correction.roi_scale = static_cast<float>(roi_scale);
+        }
+        get_parameter("detector.corner_correction.gray_threshold", detector_params.corner_correction.gray_threshold);
+        {
+            double max_dist;
+            get_parameter("detector.corner_correction.max_endpoint_distance_px", max_dist);
+            detector_params.corner_correction.max_endpoint_distance_px = static_cast<float>(max_dist);
+        }
+        get_parameter("detector.corner_correction.light.min_contours_area",
+                      detector_params.corner_correction.light.min_contours_area);
+        {
+            double min_ratio, max_ratio;
+            get_parameter("detector.corner_correction.light.min_contours_ratio", min_ratio);
+            get_parameter("detector.corner_correction.light.max_contours_ratio", max_ratio);
+            detector_params.corner_correction.light.min_contours_ratio = static_cast<float>(min_ratio);
+            detector_params.corner_correction.light.max_contours_ratio = static_cast<float>(max_ratio);
+        }
+
         detector_ = std::make_unique<Detector>(detector_params);
         RCLCPP_INFO(get_logger(), "Detector backend: %s", backend_str.c_str());
     }
@@ -174,6 +210,7 @@ namespace armor_detector {
         layer_state_.setEnabled(debug::DebugLayer::DETECT_STAGE_4, debug_config_.detect_stage_4);
         layer_state_.setEnabled(debug::DebugLayer::POSE, debug_config_.pose);
         layer_state_.setEnabled(debug::DebugLayer::RESULT, debug_config_.result);
+        layer_state_.setEnabled(debug::DebugLayer::CORNER_CORRECTION, debug_config_.corner_correction);
 
         // 非 GUI observer：始终注册
         debug_hub_.addObserver(std::make_shared<debug::DebugTiming>(debug_config_.stats_interval));
@@ -194,13 +231,14 @@ namespace armor_detector {
         debug_hub_.addObserver(std::make_shared<debug::DebugResultView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugClassificationView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugYoloView>(debug_gui_, layer_state_));
+        debug_hub_.addObserver(std::make_shared<debug::DebugCornerCorrectionView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugLayerController>(layer_state_));
 
         debug_key_timer_ = this->create_wall_timer(std::chrono::milliseconds(15), [this]() { pollDebugKeys(); });
 
         RCLCPP_INFO(this->get_logger(),
                     "按键操作: [q/ESC]退出  [Space/p]暂停/继续  [n/→]单步  "
-                    "[s]保存ROI  [+/-]加速/减速  [1-6]切换图层");
+                    "[s]保存ROI  [+/-]加速/减速  [1-6]切换图层  [0]结果");
     }
 
     void DetectorNode::initRosbagClients() {
@@ -226,6 +264,7 @@ namespace armor_detector {
         // Only clone display_bgr when debug is enabled
         if (debug_config_.show) {
             ctx.display_bgr = frame.image.clone();
+            debug_gui_.setFrame("source_show", ctx.source_bgr);
         }
 
         debug_hub_.onFrameStart(ctx);
@@ -233,6 +272,7 @@ namespace armor_detector {
         // Unified detection via backend
         DetectionResult result = detector_->detect(frame.image);
         debug_hub_.onDetection(ctx, result.debug);
+        debug_hub_.onCornerCorrection(ctx, result.debug.corner_correction);
 
         auto solved = pose_solver_.solve(result.armors);
         debug_hub_.onPoseSolved(ctx, pose_solver_.getPoseDebugData());

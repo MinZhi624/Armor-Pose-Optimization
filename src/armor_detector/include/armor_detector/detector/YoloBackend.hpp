@@ -49,7 +49,8 @@ namespace armor_detector {
 
         cv::Mat letterbox(const cv::Mat &img, float &scale);
         std::vector<RawDetection> parse(const float *data, int num_proposals, float scale);
-        std::vector<ClassifiedArmor> convert(const std::vector<RawDetection> &detections);
+        DetectedArmor convertOne(const RawDetection &detection) const;
+        std::vector<DetectedArmor> convert(const std::vector<RawDetection> &detections) const;
 
         ov::CompiledModel compiled_model_;
         ov::InferRequest infer_request_;

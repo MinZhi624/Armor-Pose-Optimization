@@ -1,5 +1,6 @@
 #pragma once
 
+#include "armor_detector/detector/ArmorCornerCorrector.hpp"
 #include "armor_detector/detector/DetectionBackend.hpp"
 #include "armor_detector/detector/DetectionResult.hpp"
 #include "armor_detector/types/ArmorData.hpp"
@@ -11,16 +12,14 @@
 
 namespace armor_detector {
 
-    class IArmorDetectorBackend; // forward declaration —内部类型，不暴露给外部
+    class IArmorDetectorBackend;
 
     class Detector {
     public:
         struct Params {
-            // 选择
             DetectionBackend backend_type = DetectionBackend::TRADITIONAL;
             LightBarColor target_color = LightBarColor::BLUE;
 
-            // Traditional 后端参数
             struct {
                 struct {
                     int gray_threshold = 100;
@@ -45,7 +44,6 @@ namespace armor_detector {
                 } number;
             } traditional;
 
-            // YOLO 后端参数
             struct {
                 std::string model_path = "model/robot_0526.onnx";
                 std::string device = "CPU";
@@ -60,6 +58,8 @@ namespace armor_detector {
                 int roi_width = -1;
                 int roi_height = -1;
             } yolo;
+
+            CornerCorrectionParams corner_correction;
         };
 
         explicit Detector(const Params &params);
@@ -70,8 +70,9 @@ namespace armor_detector {
         DetectionBackend backend() const;
 
     private:
-        std::unique_ptr<IArmorDetectorBackend> backend_;
         DetectionBackend backend_type_;
+        ArmorCornerCorrector corrector_;
+        std::unique_ptr<IArmorDetectorBackend> backend_;
     };
 
 } // namespace armor_detector

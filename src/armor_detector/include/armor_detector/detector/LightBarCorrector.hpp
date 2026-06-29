@@ -1,23 +1,48 @@
 #pragma once
 
+#include "armor_detector/detector/LightDetector.hpp"
 #include "armor_detector/types/ArmorData.hpp"
 
 #include <opencv2/core.hpp>
-#include <vector>
+#include <string>
 
 namespace armor_detector {
 
+    struct LightBarCorrectionInput {
+        LightBar seed_light; // full-image coordinates, color inherited from upstream detection
+        cv::Mat gray_roi; // single-light local ROI
+        cv::Point2f roi_offset; // ROI top-left in full-image coordinates
+        int gray_threshold = 100;
+        float search_half_width_px = 0.0f;
+        LightGeometryParams geometry;
+    };
+
+    enum class LightBarCorrectionMethod {
+        MIN_AREA_RECT,
+        FIT_ELLIPSE,
+        PCA_GRADIENT,
+    };
+
+    struct LightBarCorrectionResult {
+        bool corrected = false;
+        LightBar raw_light;
+        LightBar output_light;
+        std::string method;
+        std::string detail;
+        cv::Mat debug_gray_roi;
+        cv::Mat debug_pca_viz;
+    };
+
     class LightBarCorrector {
     public:
-        /// 调度函数：选择一种校正方法修正灯条端点
-        void lightbarPointsCorrect(LightBar &light, const std::vector<cv::Point> &contour);
+        /// Dispatch: apply correction method to a local light ROI.
+        LightBarCorrectionResult correct(const LightBarCorrectionInput &input,
+                                         LightBarCorrectionMethod method = LightBarCorrectionMethod::FIT_ELLIPSE) const;
 
     private:
-        /// 基于椭圆拟合的角度校正
-        void correctByEllipse(LightBar &light, const std::vector<cv::Point> &contour);
-
-        // 未来添加:
-        // void correctByPCA(LightBar &light, const std::vector<cv::Point> &contour);
+        LightBarCorrectionResult correctByMinAreaRect(const LightBarCorrectionInput &input) const;
+        LightBarCorrectionResult correctByEllipse(const LightBarCorrectionInput &input) const;
+        LightBarCorrectionResult correctByPCAGradient(const LightBarCorrectionInput &input) const;
     };
 
 } // namespace armor_detector

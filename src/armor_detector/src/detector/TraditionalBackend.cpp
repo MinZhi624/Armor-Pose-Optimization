@@ -106,7 +106,7 @@ namespace armor_detector {
         auto t4 = Clock::now();
 
         result.armors = classified;
-        result.debug.final_armors = classified;
+        result.debug.output_armors = classified;
 
         result.debug.traditional.preprocess = preprocess_debug_;
         result.debug.traditional.lights = light_detector_.getLightDebugData();

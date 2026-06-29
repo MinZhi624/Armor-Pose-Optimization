@@ -21,15 +21,15 @@ namespace armor_detector {
 
         // RobotDetectionModel classes: G, 1, 2, 3, 4, 5, O, Bs, Bb.
         static constexpr ClassInfo kClassMapping[9] = {
-            {ArmorName::NONE, ArmorType::NONE, "sentry"},
-            {ArmorName::ONE, ArmorType::SMALL, "one"},
-            {ArmorName::TWO, ArmorType::SMALL, "two"},
-            {ArmorName::THREE, ArmorType::SMALL, "three"},
-            {ArmorName::FOUR, ArmorType::SMALL, "four"},
-            {ArmorName::FIVE, ArmorType::SMALL, "five"},
-            {ArmorName::NONE, ArmorType::NONE, "outpost"},
-            {ArmorName::NONE, ArmorType::NONE, "base_small"},
-            {ArmorName::NONE, ArmorType::LARGE, "base_big"},
+            {ArmorName::SENTINEL, ArmorType::SMALL, "sentry"},      // G: 哨兵
+            {ArmorName::ONE, ArmorType::SMALL, "one"},              // 1: 一号
+            {ArmorName::TWO, ArmorType::SMALL, "two"},              // 2: 二号
+            {ArmorName::THREE, ArmorType::SMALL, "three"},          // 3: 三号
+            {ArmorName::FOUR, ArmorType::SMALL, "four"},            // 4: 四号
+            {ArmorName::FIVE, ArmorType::SMALL, "five"},            // 5: 五号
+            {ArmorName::OUTPOST, ArmorType::SMALL, "outpost"},      // O: 前哨站
+            {ArmorName::BASE, ArmorType::SMALL, "base_small"},      // Bs: 基地
+            {ArmorName::BASE, ArmorType::LARGE, "base_big"},        // Bb: 基地大装甲
         };
 
         // RobotDetectionModel reference filtering implies: 0=blue, 1=red, 2=gray, 3=purple.
@@ -59,6 +59,26 @@ namespace armor_detector {
                 return ArmorType::NONE;
             }
             return (width / height > 3.2f) ? ArmorType::LARGE : ArmorType::SMALL;
+        }
+
+        LightBar makeYoloLightBar(const cv::Point2f &top, const cv::Point2f &bottom, LightBarColor color, int id) {
+            LightBar light;
+            light.top = top;
+            light.bottom = bottom;
+            light.center = (top + bottom) * 0.5f;
+            light.length = cv::norm(bottom - top);
+            light.width = 0.0;
+            light.area = 0;
+            light.id = id;
+            light.color = color;
+            if (light.length > 1e-6) {
+                const cv::Point2f axis = bottom - top;
+                light.angle = std::atan2(axis.y, axis.x);
+                light.rect = cv::RotatedRect(light.center,
+                                             cv::Size2f(0.0f, static_cast<float>(light.length)),
+                                             static_cast<float>(light.angle * 180.0 / CV_PI));
+            }
+            return light;
         }
 
         std::string shapeToString(const ov::Shape &shape) {
@@ -181,15 +201,23 @@ namespace armor_detector {
         return detections;
     }
 
-    std::vector<ClassifiedArmor> YoloArmorDetectorBackend::convert(const std::vector<RawDetection> &detections) {
-        std::vector<ClassifiedArmor> result;
+    DetectedArmor YoloArmorDetectorBackend::convertOne(const RawDetection &det) const {
+        DetectedArmor armor;
+        armor.geometry.corners = {det.keypoints[0], det.keypoints[1], det.keypoints[2], det.keypoints[3]};
+        armor.geometry.paired_lights = {
+            makeYoloLightBar(det.keypoints[0], det.keypoints[3], det.color, 0),
+            makeYoloLightBar(det.keypoints[1], det.keypoints[2], det.color, 1),
+        };
+        armor.geometry.type = det.type;
+        armor.classification.name = det.name;
+        armor.classification.confidence = det.score;
+        return armor;
+    }
+
+    std::vector<DetectedArmor> YoloArmorDetectorBackend::convert(const std::vector<RawDetection> &detections) const {
+        std::vector<DetectedArmor> result;
         for (const auto &det : detections) {
-            ClassifiedArmor armor;
-            armor.geometry.corners = {det.keypoints[0], det.keypoints[1], det.keypoints[2], det.keypoints[3]};
-            armor.geometry.type = det.type;
-            armor.classification.name = det.name;
-            armor.classification.confidence = det.score;
-            result.push_back(armor);
+            result.push_back(convertOne(det));
         }
         return result;
     }
@@ -262,19 +290,14 @@ namespace armor_detector {
         }
 
         for (const auto &d : raw) {
-            ClassifiedArmor a;
-            a.geometry.corners = {d.keypoints[0], d.keypoints[1], d.keypoints[2], d.keypoints[3]};
-            a.geometry.type = d.type;
-            a.classification.name = d.name;
-            a.classification.confidence = d.score;
-            result.debug.yolo.stage2_score_filtered.push_back(a);
+            result.debug.yolo.stage2_score_filtered.push_back(convertOne(d));
         }
 
         std::vector<RawDetection> class_color_filtered;
         for (const auto &d : raw) {
             if (d.name == ArmorName::NONE || d.type == ArmorType::NONE) {
                 debug::RejectedArmor rej;
-                rej.geometry.corners = {d.keypoints[0], d.keypoints[1], d.keypoints[2], d.keypoints[3]};
+                rej.geometry = convertOne(d).geometry;
                 rej.reason = debug::DebugRejectReason::TYPE_MISMATCH;
                 rej.detail = "unsupported_class=" + std::to_string(d.class_id);
                 result.debug.yolo.stage3_filter_rejected.push_back(rej);
@@ -282,7 +305,7 @@ namespace armor_detector {
             }
             if (d.color != target_color_) {
                 debug::RejectedArmor rej;
-                rej.geometry.corners = {d.keypoints[0], d.keypoints[1], d.keypoints[2], d.keypoints[3]};
+                rej.geometry = convertOne(d).geometry;
                 rej.reason = debug::DebugRejectReason::BAD_COLOR;
                 rej.detail = "color_id=" + std::to_string(d.color_id);
                 result.debug.yolo.stage3_filter_rejected.push_back(rej);
@@ -320,10 +343,7 @@ namespace armor_detector {
             }
             else {
                 debug::RejectedArmor rej;
-                rej.geometry.corners = {class_color_filtered[i].keypoints[0],
-                                        class_color_filtered[i].keypoints[1],
-                                        class_color_filtered[i].keypoints[2],
-                                        class_color_filtered[i].keypoints[3]};
+                rej.geometry = convertOne(class_color_filtered[i]).geometry;
                 rej.reason = debug::DebugRejectReason::UNKNOWN;
                 rej.detail = "nms_suppressed";
                 result.debug.yolo.stage3_nms_rejected.push_back(rej);
@@ -333,7 +353,7 @@ namespace armor_detector {
         auto t3 = Clock::now();
 
         auto armors = convert(nms_result);
-        std::vector<ClassifiedArmor> filtered;
+        std::vector<DetectedArmor> filtered;
         for (auto &a : armors) {
             if (a.classification.confidence >= params_.min_confidence) {
                 filtered.push_back(a);
@@ -349,8 +369,8 @@ namespace armor_detector {
         auto t4 = Clock::now();
 
         result.armors = filtered;
-        result.debug.final_armors = filtered;
-        result.debug.yolo.stage4_final = filtered;
+        result.debug.output_armors = filtered;
+        result.debug.yolo.stage4_backend_armors = filtered;
 
         result.debug.timings.push_back({"letterbox", std::chrono::duration_cast<ms>(t1 - t0).count()});
         result.debug.timings.push_back({"infer", std::chrono::duration_cast<ms>(t2 - t1).count()});

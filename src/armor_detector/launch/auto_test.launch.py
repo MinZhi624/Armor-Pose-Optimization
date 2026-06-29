@@ -5,18 +5,23 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     package_share = get_package_share_directory('armor_detector')
-    rosbag_path = os.path.join(
+    base_path = os.path.join(
         os.path.dirname(package_share), '..', '..', '..', 'src',
-        'armor_detector', 'Test', 'video', 'video1'
+        'armor_detector', 'Test', 'video'
     )
 
     config = os.path.join(package_share, 'config', 'config.yaml')
+
+    # ---- 选择测试视频（启动时 video:=video2 即可切换） ----
+    video = LaunchConfiguration('video')
+
+    rosbag_path = PathJoinSubstitution([base_path, video])
 
     frame_count = LaunchConfiguration('frame_count')
     timing_interval = LaunchConfiguration('timing_interval')
@@ -53,6 +58,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument('video', default_value='video1'),
         DeclareLaunchArgument('frame_count', default_value='150'),
         DeclareLaunchArgument('timing_interval', default_value='50'),
 

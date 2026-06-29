@@ -35,7 +35,7 @@ namespace armor_detector::debug {
         }
 
         if (layer_state_.enabled(DebugLayer::DETECT_STAGE_4)) {
-            drawDetections(context.display_bgr, data.final_armors,
+            drawDetections(context.display_bgr, data.yolo.stage4_backend_armors,
                            cv::Scalar(255, 0, 255), "final");
         }
     }
@@ -72,7 +72,7 @@ namespace armor_detector::debug {
     }
 
     void DebugYoloView::drawDetections(cv::Mat &display,
-                                        const std::vector<ClassifiedArmor> &armors,
+                                        const std::vector<DetectedArmor> &armors,
                                         const cv::Scalar &color,
                                         const std::string &label) {
         for (size_t i = 0; i < armors.size(); ++i) {

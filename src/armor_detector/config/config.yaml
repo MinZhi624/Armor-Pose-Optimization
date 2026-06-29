@@ -1,9 +1,36 @@
 armor_detector_node_cpp:
   ros__parameters:
+    # ==================== 检测器 ====================
     detector:
-      backend: "yolo"  # traditional / yolo
+      # 后端类型: "traditional"（传统轮廓检测）/ "yolo"（YOLO 神经网络）
+      backend: "yolo"
+      # 目标灯条颜色: "RED"（攻击红方）/ "BLUE"（攻击蓝方）
       target_color: "RED"
 
+      # --------------- 角点修正 ---------------
+      corner_correction:
+        # 是否启用角点修正（true/false）
+        enabled: true
+        # 灯条修正方法:
+        #   "fit_ellipse"      — 椭圆拟合，推荐，速度和精度均衡
+        #   "min_area_rect"    — 最小外接矩形，最快但精度略低
+        #   "pca_gradient"     — PCA + 亮度跳变，精度最高但较慢
+        method: "pca_gradient"
+        # ROI 扩展倍率（相对于装甲板四角包围框，1.0=不扩展，1.25=扩展25%）
+        roi_scale: 1.25
+        # ROI 内二值化灰度阈值（0-255），越低越敏感
+        gray_threshold: 100
+        # 修正后四角与原始四角的最大允许距离和（像素），超过则判定修正失败
+        max_endpoint_distance_px: 15.0
+        # ROI 内灯条候选的几何筛选参数
+        light:
+          # 轮廓最小面积（像素²）
+          min_contours_area: 30
+          # 灯条短边/长边比值范围（灯条应为细长形状）
+          min_contours_ratio: 0.06
+          max_contours_ratio: 0.5
+
+      # --------------- 传统后端参数 ---------------
       traditional:
         preprocess:
           gray_threshold: 100
@@ -23,34 +50,54 @@ armor_detector_node_cpp:
           model_path: "model/number_cnn.onnx"
           threshold: 0.5
 
+      # --------------- YOLO 后端参数 ---------------
       yolo:
+        # 模型路径（相对于 install/share 目录）
         model_path: "model/robot_0526.onnx"
+        # 推理设备: "CPU" / "GPU" / "AUTO"
         device: "CPU"
+        # 模型输入尺寸（正方形，像素）
         input_size: 640
+        # 置信度阈值：低于此值的检测直接丢弃
         score_threshold: 0.65
+        # NMS IoU 阈值：重叠超过此值的检测框被抑制
         nms_threshold: 0.45
+        # 最终最低置信度：NMS 后低于此值的检测被过滤
         min_confidence: 0.65
+        # 解码后最多保留的原始候选数
         max_raw_candidates: 100
+        # 是否使用 ROI 裁剪输入（减少计算量）
         use_roi: false
+        # ROI 区域（use_roi=true 时生效，width/height=-1 表示全图）
         roi:
           x: 0
           y: 0
           width: -1
           height: -1
 
+    # ==================== Debug ====================
     debug:
+      # OpenCV GUI 开关（false=无头模式，不显示窗口）
       show: true
+      # 是否通过 ROS service 控制 rosbag 播放
       rosbag_control: true
       rosbag_player_node: "/rosbag2_player"
-      detect_stage_1: false
-      detect_stage_2: false
-      detect_stage_3: false
-      detect_stage_4: false
-      pose: true
-      result: true
+      # 各阶段图层默认开关（数字键 1-6 切换）
+      detect_stage_1: false   # 1键: 传统=预处理 / YOLO=letterbox
+      detect_stage_2: false   # 2键: 传统=灯条 / YOLO=score过滤
+      detect_stage_3: false   # 3键: 传统=装甲匹配 / YOLO=NMS结果
+      detect_stage_4: false   # 4键: 传统=数字分类 / YOLO=后端最终输出
+      corner_correction: false # 6键: 角点修正对比（原始→修正）
+      pose: true              # 5键: /armor_markers 发布
+      result: true            # 0键: 最终装甲板 X 标记
+      # 耗时统计打印间隔（帧数）
       stats_interval: 50
 
+    # ==================== 播放控制 ====================
     playback:
+      # 播放模式: "realtime"（按时间播放）/ "step"（逐帧播放，auto_test 用）
       mode: "realtime"
+      # 最大处理帧数（0=不限制）
       max_frames: 0
+      # 处理完指定帧数后是否自动退出
       exit_on_complete: false

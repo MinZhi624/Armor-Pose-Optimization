@@ -36,6 +36,7 @@ namespace armor_detector::debug {
         DETECT_STAGE_2,  // traditional: lights; yolo: raw candidates after score threshold
         DETECT_STAGE_3,  // traditional: armor match; yolo: NMS/filter result
         DETECT_STAGE_4,  // traditional: classification; yolo: final detections
+        CORNER_CORRECTION,
         POSE,
         RESULT,
     };
@@ -117,7 +118,7 @@ namespace armor_detector::debug {
     };
 
     struct ClassificationDebugData {
-        std::vector<ClassifiedArmor> classified_armors;
+        std::vector<DetectedArmor> classified_armors;
         std::vector<cv::Mat> number_rois;
     };
 

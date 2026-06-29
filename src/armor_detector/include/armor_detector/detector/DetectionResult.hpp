@@ -8,7 +8,7 @@
 namespace armor_detector {
 
     struct DetectionResult {
-        std::vector<ClassifiedArmor> armors;
+        std::vector<DetectedArmor> armors;
         debug::DetectionDebugData debug;
     };
 

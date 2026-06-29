@@ -4,23 +4,29 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     package_share = get_package_share_directory('armor_detector')
-    rosbag_path = os.path.join(
+    base_path = os.path.join(
         os.path.dirname(package_share), '..', '..', '..', 'src',
-        'armor_detector', 'Test', 'video', 'video1'
+        'armor_detector', 'Test', 'video'
     )
 
     config = os.path.join(package_share, 'config', 'config.yaml')
+
+    # ---- 选择测试视频（启动时 video:=video2 即可切换） ----
+    video = LaunchConfiguration('video')
+
+    rosbag_path = PathJoinSubstitution([base_path, video])
 
     use_foxglove = LaunchConfiguration('use_foxglove')
     foxglove_port = LaunchConfiguration('foxglove_port')
 
     return LaunchDescription([
+        DeclareLaunchArgument('video', default_value='video1'),
         DeclareLaunchArgument('use_foxglove', default_value='true'),
         DeclareLaunchArgument('foxglove_port', default_value='8765'),
 

@@ -171,8 +171,8 @@ namespace armor_detector {
         }
     }
 
-    std::vector<ClassifiedArmor> NumberClassifier::deduplicate(std::vector<ClassifiedArmor> armors) {
-        std::vector<ClassifiedArmor> result;
+    std::vector<DetectedArmor> NumberClassifier::deduplicate(std::vector<DetectedArmor> armors) {
+        std::vector<DetectedArmor> result;
         std::vector<bool> removed(armors.size(), false);
 
         for (std::size_t i = 0; i < armors.size(); ++i) {
@@ -223,7 +223,7 @@ namespace armor_detector {
         return result;
     }
 
-    std::vector<ClassifiedArmor> NumberClassifier::classify(const std::vector<ArmorCandidate> &candidates,
+    std::vector<DetectedArmor> NumberClassifier::classify(const std::vector<ArmorCandidate> &candidates,
                                                             const cv::Mat &img_bgr) {
         classification_debug_.classified_armors.clear();
         classification_debug_.number_rois.clear();
@@ -232,7 +232,7 @@ namespace armor_detector {
             return {};
         }
 
-        std::vector<ClassifiedArmor> all_results;
+        std::vector<DetectedArmor> all_results;
 
         for (const auto &candidate : candidates) {
             const auto &geometry = candidate.geometry;
@@ -243,7 +243,7 @@ namespace armor_detector {
             // Get pattern for debug display
             cv::Mat pattern = getArmorPattern(img_bgr, geometry);
 
-            ClassifiedArmor classified;
+            DetectedArmor classified;
             classified.geometry = geometry;
             classified.classification = classification;
             classified.classification.pattern = pattern;

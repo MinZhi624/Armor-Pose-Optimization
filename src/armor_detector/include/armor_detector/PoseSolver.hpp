@@ -20,7 +20,7 @@ namespace armor_detector {
 
         void init(const CameraInfo &camera_info);
 
-        std::vector<SolvedArmor> solve(const std::vector<ClassifiedArmor> &armors);
+        std::vector<SolvedArmor> solve(const std::vector<DetectedArmor> &armors);
 
         const debug::PoseDebugData &getPoseDebugData() const {
             return pose_debug_;

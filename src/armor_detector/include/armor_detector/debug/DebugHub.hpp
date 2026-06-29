@@ -76,6 +76,12 @@ namespace armor_detector::debug {
             }
         }
 
+        void onCornerCorrection(DebugFrameContext &context, const CornerCorrectionDebugData &data) {
+            for (auto &obs : observers_) {
+                obs->onCornerCorrection(context, data);
+            }
+        }
+
         void onFrameEnd(DebugFrameContext &context) {
             for (auto &observer : observers_) {
                 observer->onFrameEnd(context);

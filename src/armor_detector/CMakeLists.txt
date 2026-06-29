@@ -29,6 +29,7 @@ add_executable(armor_detector_node
   src/detector/LightDetector.cpp
   src/detector/TraditionalBackend.cpp
   src/detector/LightBarCorrector.cpp
+  src/detector/ArmorCornerCorrector.cpp
   src/NumberClassifier.cpp
   src/debug/DebugGUI.cpp
   src/debug/DebugMsg.cpp
@@ -42,6 +43,7 @@ add_executable(armor_detector_node
   src/debug/DebugLayerController.cpp
   src/debug/DebugPoseMarkerPublisher.cpp
   src/debug/DebugYolo.cpp
+  src/debug/DebugCornerCorrectionView.cpp
   src/detector/YoloBackend.cpp
 )
 

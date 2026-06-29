@@ -3,11 +3,13 @@
 #include "armor_detector/detector/TraditionalBackend.hpp"
 #include "armor_detector/detector/YoloBackend.hpp"
 
+#include <chrono>
 #include <stdexcept>
 
 namespace armor_detector {
 
-    Detector::Detector(const Params &params) : backend_type_(params.backend_type) {
+    Detector::Detector(const Params &params) :
+        backend_type_(params.backend_type), corrector_(params.corner_correction) {
         if (params.backend_type == DetectionBackend::TRADITIONAL) {
             TraditionalArmorDetectorBackend::Params trad_params;
             trad_params.preprocess.gray_threshold = params.traditional.preprocess.gray_threshold;
@@ -54,7 +56,41 @@ namespace armor_detector {
         if (!backend_) {
             throw std::runtime_error("Detector backend not initialized");
         }
-        return backend_->detect(img_bgr);
+
+        using Clock = std::chrono::steady_clock;
+        using ms = std::chrono::duration<double, std::milli>;
+
+        // 1. Backend detection
+        auto detect_start = Clock::now();
+        DetectionResult result = backend_->detect(img_bgr);
+
+        // 2. Corner correction (after backend, before PnP)
+        auto correction_start = Clock::now();
+        auto correction = corrector_.correctAll(result.armors, img_bgr);
+        auto correction_end = Clock::now();
+
+        const double correction_elapsed_ms = std::chrono::duration_cast<ms>(correction_end - correction_start).count();
+        const double detect_total_ms = std::chrono::duration_cast<ms>(correction_end - detect_start).count();
+
+        result.armors = correction.armors;
+        result.debug.output_armors = correction.armors;
+        result.debug.corner_correction = correction.debug;
+        result.debug.corner_correction.elapsed_ms = correction_elapsed_ms;
+
+        bool has_detect_total = false;
+        for (auto &timing : result.debug.timings) {
+            if (timing.name == "detect_total") {
+                timing.elapsed_ms = detect_total_ms;
+                has_detect_total = true;
+                break;
+            }
+        }
+        if (!has_detect_total) {
+            result.debug.timings.push_back({"detect_total", detect_total_ms});
+        }
+        result.debug.timings.push_back({"corner_correction", correction_elapsed_ms});
+
+        return result;
     }
 
     DetectionBackend Detector::backend() const {

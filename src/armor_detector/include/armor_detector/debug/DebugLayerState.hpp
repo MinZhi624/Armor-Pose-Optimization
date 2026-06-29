@@ -46,6 +46,7 @@ namespace armor_detector::debug {
                 case DebugLayer::DETECT_STAGE_2:  return "DETECT_STAGE_2";
                 case DebugLayer::DETECT_STAGE_3:  return "DETECT_STAGE_3";
                 case DebugLayer::DETECT_STAGE_4:  return "DETECT_STAGE_4";
+                case DebugLayer::CORNER_CORRECTION:   return "CORNER_CORRECTION";
                 case DebugLayer::POSE:            return "POSE";
                 case DebugLayer::RESULT:          return "RESULT";
                 default:                          return "UNKNOWN";

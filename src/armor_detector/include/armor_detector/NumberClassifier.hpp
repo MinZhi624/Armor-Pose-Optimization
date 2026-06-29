@@ -21,7 +21,7 @@ namespace armor_detector {
         NumberClassifier() = default;
         explicit NumberClassifier(const Params &params);
 
-        std::vector<ClassifiedArmor> classify(const std::vector<ArmorCandidate> &candidates, const cv::Mat &img_bgr);
+        std::vector<DetectedArmor> classify(const std::vector<ArmorCandidate> &candidates, const cv::Mat &img_bgr);
 
         const debug::ClassificationDebugData &getClassificationDebugData() const {
             return classification_debug_;
@@ -33,7 +33,7 @@ namespace armor_detector {
         cv::Mat getArmorPattern(const cv::Mat &img_bgr, const ArmorGeometry &geometry) const;
         bool checkArmorName(const ArmorClassification &classification) const;
         bool checkArmorType(const ArmorGeometry &geometry, const ArmorClassification &classification) const;
-        std::vector<ClassifiedArmor> deduplicate(std::vector<ClassifiedArmor> armors);
+        std::vector<DetectedArmor> deduplicate(std::vector<DetectedArmor> armors);
 
         static cv::Mat softmax(const cv::Mat &logits);
         static float sigmoid(float x);

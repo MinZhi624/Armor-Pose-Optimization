@@ -24,7 +24,7 @@ namespace armor_detector::debug {
 
     private:
         void showStage1(const DetectionDebugData &data);
-        void drawDetections(cv::Mat &display, const std::vector<ClassifiedArmor> &armors,
+        void drawDetections(cv::Mat &display, const std::vector<DetectedArmor> &armors,
                             const cv::Scalar &color, const std::string &label);
         void drawRejected(cv::Mat &display, const std::vector<RejectedArmor> &rejected);
 
