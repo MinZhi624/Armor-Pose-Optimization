@@ -1,10 +1,10 @@
-#include "armor_detector/yaw/YawSearch.hpp"
+#include "armor_detector/pose/PoseSearch.hpp"
 #include "armor_detector/tools/angle.hpp"
 
 #include <cmath>
 #include <limits>
 
-namespace armor_detector::yaw {
+namespace armor_detector::pose {
 
     // 搜索参数（后续可参数化）
     constexpr double kSearchRangeRad = tools::degToRad(30.0);
@@ -12,7 +12,7 @@ namespace armor_detector::yaw {
     constexpr double kLocalRangeRad = tools::degToRad(3.0);
     constexpr int kTernaryIterations = 8;
 
-    double enumerate(double center_yaw, const YawErrorFunction &calculate_error,
+    double enumerateYaw(double center_yaw, const YawErrorFunction &calculate_error,
                      double search_range_rad, double step_rad) {
         using tools::normalizeRadAngle;
 
@@ -34,7 +34,7 @@ namespace armor_detector::yaw {
         return best_yaw;
     }
 
-    double ternary(double initial_yaw, const YawErrorFunction &calculate_error,
+    double ternaryYaw(double initial_yaw, const YawErrorFunction &calculate_error,
                    double local_range_rad, int iterations) {
         using tools::normalizeRadAngle;
 
@@ -58,11 +58,11 @@ namespace armor_detector::yaw {
         return normalizeRadAngle((l + r) / 2.0);
     }
 
-    double runYawSearch(double center_yaw, const YawErrorFunction &calculate_error) {
-        const double coarse_yaw = enumerate(center_yaw, calculate_error,
+    double refineYawFromPnp(double center_yaw, const YawErrorFunction &calculate_error) {
+        const double coarse_yaw = enumerateYaw(center_yaw, calculate_error,
                                             kSearchRangeRad, kEnumerateStepRad);
-        return ternary(coarse_yaw, calculate_error,
+        return ternaryYaw(coarse_yaw, calculate_error,
                        kLocalRangeRad, kTernaryIterations);
     }
 
-} // namespace armor_detector::yaw
+} // namespace armor_detector::pose

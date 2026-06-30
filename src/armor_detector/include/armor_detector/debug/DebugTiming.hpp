@@ -42,6 +42,9 @@ namespace armor_detector::debug {
         std::chrono::steady_clock::time_point detect_end_;
         double pose_accum_ = 0.0;
         std::size_t pose_count_ = 0;
+
+        std::map<std::string, double> pose_stage_accum_;
+        std::map<std::string, size_t> pose_stage_count_;
     };
 
 } // namespace armor_detector::debug

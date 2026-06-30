@@ -7,7 +7,9 @@
 #include "armor_detector/debug/DebugPreprocess.hpp"
 #include "armor_detector/debug/DebugResult.hpp"
 #include "armor_detector/debug/DebugTiming.hpp"
+#include "armor_detector/debug/DebugPoseRefineStats.hpp"
 #include "armor_detector/debug/DebugYolo.hpp"
+#include "armor_detector/pose/PoseRefineData.hpp"
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
@@ -77,6 +79,14 @@ namespace armor_detector {
         get_parameter("detector.backend", backend_str);
         get_parameter("detector.target_color", target_color_str);
         LightBarColor target_color = (target_color_str == "RED") ? LightBarColor::RED : LightBarColor::BLUE;
+
+        // --- PoseSolver ---
+        const auto refine_method_name = this->declare_parameter<std::string>("pose.refine_method", "yaw_search");
+        const auto refine_method = pose::poseRefineMethodFromString(refine_method_name);
+        pose_solver_.setRefineMethod(refine_method);
+        RCLCPP_INFO(this->get_logger(),
+              "位姿估计方法: %s",
+              pose::toString(refine_method).c_str());
 
         auto package_share = ament_index_cpp::get_package_share_directory("armor_detector");
 
@@ -240,6 +250,7 @@ namespace armor_detector {
         // 非 GUI observer：始终注册
         debug_hub_.addObserver(std::make_shared<debug::DebugTiming>(debug_config_.stats_interval));
         debug_hub_.addObserver(std::make_shared<debug::DebugPoseMarkerPublisher>(*this, layer_state_));
+        debug_hub_.addObserver(std::make_shared<debug::DebugPoseRefineStats>(debug_config_.stats_interval));
 
         // GUI observer：仅 debug.show=true 时注册
         if (!debug_config_.show) {

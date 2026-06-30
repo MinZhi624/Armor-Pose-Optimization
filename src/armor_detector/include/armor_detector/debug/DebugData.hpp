@@ -122,8 +122,16 @@ namespace armor_detector::debug {
         std::vector<cv::Mat> number_rois;
     };
 
-    struct PoseDebugData {
-        std::vector<SolvedArmor> solved_armors;
+    struct PoseRefineDebugRecord {
+        std::size_t armor_index = 0;
+        std::string method;
+        bool success = false;
+        double reprojection_error_px = 0.0;
     };
 
+    struct PoseDebugData {
+        std::vector<SolvedArmor> solved_armors;
+        std::vector<PoseRefineDebugRecord> refine_records;
+        std::vector<StageTiming> timings;
+    };
 } // namespace armor_detector::debug

@@ -25,7 +25,8 @@ add_executable(armor_detector_node
   src/detector/Detector.cpp
   src/CameraProvider.cpp
   src/PoseSolver.cpp
-  src/yaw/YawSearch.cpp
+  src/pose/PoseSearch.cpp
+  src/pose/PoseRefineData.cpp
   src/detector/LightDetector.cpp
   src/detector/TraditionalBackend.cpp
   src/detector/LightBarCorrector.cpp
@@ -44,6 +45,7 @@ add_executable(armor_detector_node
   src/debug/DebugPoseMarkerPublisher.cpp
   src/debug/DebugYolo.cpp
   src/debug/DebugCornerCorrectionView.cpp
+  src/debug/DebugPoseRefineStats.cpp
   src/detector/YoloBackend.cpp
 )
 
