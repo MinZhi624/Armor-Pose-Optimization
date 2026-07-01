@@ -77,7 +77,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('video', default_value='video1'),
-        DeclareLaunchArgument('refine_method', default_value='yaw_search'),
+        DeclareLaunchArgument('refine_method', default_value='pose_only_ba_4dof'),
         DeclareLaunchArgument('frame_count', default_value='0'),
         DeclareLaunchArgument('timing_interval', default_value='50'),
         DeclareLaunchArgument('use_foxglove', default_value='true'),

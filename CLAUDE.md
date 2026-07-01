@@ -70,8 +70,8 @@ Letterbox → OpenVINO 推理 → 解码(22列) → NMS → 类别/颜色过滤
 - **TraditionalArmorDetectorBackend** — 传统后端实现，包住 Detector→LightDetector→ArmorDetector→NumberClassifier。
 - **YoloArmorDetectorBackend** — YOLO 后端实现，OpenVINO 推理 + 22 列输出解析 + NMS。
 - **CameraProvider** — 从 yaml 加载相机内参，`receiveImage(msg)` 用 `cv_bridge::toCvShare` 零拷贝转换为 `Frame`，强制输出 BGR8。
-- **PoseSolver** — PnP 位姿解算（IPPE + iterative fallback），几何选择 + yaw 连续性修正 + yaw 重投影优化。输出 `SolvedArmor`。
-- **YawSearch** — 两阶段 yaw 搜索算法（枚举粗搜 + 三分精搜），最小化重投影误差。
+- **PoseSolver** — PnP 位姿解算（IPPE + iterative fallback），几何选择 + yaw 连续性修正。输出 `SolvedArmor`。
+- **PoseRefineRunner** — 位姿优化分发器，支持 `none`（基准）和 `yaw_search`（枚举粗搜 + 三分精搜）两种方法。可扩展新优化器。详见 `docs/pose_refine.md`。
 
 ### 配置结构
 
@@ -145,6 +145,7 @@ YOLO 参考：`/home/minzhi/Desktop/参考/sp_vision_25/tasks/auto_aim/yolos/`
 - `docs/DebugGUI.md` — GUI 注册和显示标准（含 /armor_markers 文档）
 - `docs/Debug.md` — Debug 系统扩展指南
 - `docs/AlgorithmReference.md` — 核心算法参考（含 YOLO 输出布局、class mapping）
+- `docs/pose_refine.md` — 位姿优化模块架构、方法、debug 基础设施、扩展指南
 
 ## QoS 注意事项
 

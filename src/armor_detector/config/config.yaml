@@ -76,8 +76,8 @@ armor_detector_node_cpp:
           height: -1
     # ------------------- Pose ----------------------
     pose:
-      # 位姿矫正方法: "yaw_search" , "none"
-      refine_method: "yaw_search"
+      # 位姿矫正方法: "pose_only_ba_6dof", "pose_only_ba_4dof", "yaw_search", "none"
+      refine_method: "pose_only_ba_4dof"
     # ==================== Debug ====================
     debug:
       # OpenCV GUI 开关（false=无头模式，不显示窗口）``

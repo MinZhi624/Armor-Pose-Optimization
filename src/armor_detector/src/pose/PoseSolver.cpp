@@ -1,29 +1,38 @@
 #include "armor_detector/pose/PoseSolver.hpp"
+#include "armor_detector/pose/PoseProjection.hpp"
 #include "armor_detector/tools/angle.hpp"
 #include "armor_detector/tools/armor_geometry.hpp"
 #include "armor_detector/tools/geometry.hpp"
 #include "armor_detector/tools/transform.hpp"
 
 #include <opencv2/calib3d.hpp>
-#include <opencv2/core/eigen.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 
 namespace armor_detector {
 
-    using tools::ARMOR_PITCH_RAD;
     using tools::LARGE_ARMOR_POINTS;
     using tools::normalizeRadAngle;
-    using tools::R_CAMERA_GIMBAL;
     using tools::R_GIMBAL_CAMERA;
     using tools::SMALL_ARMOR_POINTS;
 
-    static constexpr double SAME_ARMOR_CENTER_THRESH = 30.0;
-    static constexpr double YAW_MUTATION_THRESH = M_PI_2;
-    static constexpr double REPROJECTION_ERROR_MARGIN = 3.0;
-    static constexpr double MIN_VALID_ARMOR_PITCH_WORLD = -0.05;
+    namespace {
+        constexpr double SAME_ARMOR_CENTER_THRESH = 30.0;
+        constexpr double YAW_MUTATION_THRESH = M_PI_2;
+        constexpr double REPROJECTION_ERROR_MARGIN = 3.0;
+        constexpr double MIN_VALID_ARMOR_PITCH_WORLD = -0.05;
+
+        cv::Mat distortionMat(const cv::Vec<double, 5> &distortion_coefficients) {
+            cv::Mat distortion_mat(1, 5, CV_64F);
+            for (int i = 0; i < 5; ++i) {
+                distortion_mat.at<double>(0, i) = distortion_coefficients[i];
+            }
+            return distortion_mat;
+        }
+    } // namespace
 
     // ===================== 构造 / 初始化 =====================
 
@@ -32,11 +41,8 @@ namespace armor_detector {
     }
 
     void PoseSolver::init(const CameraInfo &camera_info) {
-        camera_matrix_ = cv::Mat(cv::Matx33d(camera_info.camera_matrix));
-        distortion_coefficients_ = cv::Mat(1, 5, CV_64F);
-        for (int i = 0; i < 5; ++i) {
-            distortion_coefficients_.at<double>(0, i) = camera_info.distortion_coefficients[i];
-        }
+        camera_matrix_ = camera_info.camera_matrix;
+        distortion_coefficients_ = camera_info.distortion_coefficients;
     }
 
     // ===================== 主流程 =====================
@@ -77,7 +83,9 @@ namespace armor_detector {
             const int armor_name_key = static_cast<int>(classified.classification.name);
             std::size_t best_id = selectBestCandidate(candidates, armor_name_key, target_center);
 
-            SolvedArmor solved = createSolvedArmorFromPnpInitial(classified, candidates[best_id]);
+            const auto &best_candidate = candidates[best_id];
+            SolvedArmor solved = createSolvedArmorFromRvecTvec(classified, best_candidate.rvec, best_candidate.tvec);
+            const ArmorPose initial_pose = solved.pose;
 
             auto pnp_end = std::chrono::steady_clock::now();
             pnp_elapsed_ms += std::chrono::duration<double, std::milli>(pnp_end - pnp_start).count();
@@ -86,39 +94,37 @@ namespace armor_detector {
             auto refine_start = std::chrono::steady_clock::now();
             pose::PoseRefineInput refine_input;
             refine_input.image_corners = solved.geometry.corners;
-            refine_input.initial_xyz_gimbal = solved.pose.xyz_gimbal;
-            refine_input.initial_yaw_rad = solved.pose.ypr_gimbal.x();
+            refine_input.initial_rvec = best_candidate.rvec;
+            refine_input.initial_tvec = best_candidate.tvec;
             refine_input.armor_type = classified.geometry.type;
+            refine_input.camera_matrix = camera_matrix_;
+            refine_input.distortion_coefficients = distortion_coefficients_;
 
-            auto error_func = [&](const Eigen::Vector3d &xyz_gimbal, double yaw_rad) -> double {
-                return calculatePoseRefineReprojectionError(refine_input, xyz_gimbal, yaw_rad);
-            };
-
-            const double initial_error = pose_refiner.calculateInitialError(refine_input, error_func);
-            const auto refine_output = pose_refiner.refine(refine_input, error_func);
+            const double initial_error = pose_refiner.calculateInitialError(refine_input);
+            const auto refine_output = pose_refiner.refine(refine_input);
             if (refine_output.success) {
-                solved.pose.xyz_gimbal = refine_output.xyz_gimbal;
-                solved.pose.ypr_gimbal[0] = refine_output.yaw_rad;
-                solved.pose.ypd_gimbal = tools::calculateYPD(solved.pose.xyz_gimbal);
+                solved = createSolvedArmorFromRvecTvec(classified, refine_output.rvec, refine_output.tvec);
             }
+            const ArmorPose &final_pose = solved.pose;
 
             // Fill debug record with full fields
             debug::PoseRefineDebugRecord rec;
             rec.armor_index = solved_armors.size();
             rec.armor_name = static_cast<int>(classified.classification.name);
-            rec.armor_type = (classified.geometry.type == ArmorType::LARGE) ? "large" :
-                             (classified.geometry.type == ArmorType::SMALL) ? "small" : "none";
+            rec.armor_type = (classified.geometry.type == ArmorType::LARGE) ? "large"
+                : (classified.geometry.type == ArmorType::SMALL)            ? "small"
+                                                                            : "none";
             rec.confidence = classified.classification.confidence;
             rec.center_x_px = target_center.x;
             rec.center_y_px = target_center.y;
             rec.method = pose_refiner.methodName();
             rec.success = refine_output.success;
-            rec.initial_xyz_gimbal = refine_input.initial_xyz_gimbal;
-            rec.final_xyz_gimbal = refine_output.xyz_gimbal;
-            rec.delta_xyz_gimbal = refine_output.xyz_gimbal - refine_input.initial_xyz_gimbal;
-            rec.initial_yaw_rad = refine_input.initial_yaw_rad;
-            rec.final_yaw_rad = refine_output.yaw_rad;
-            rec.delta_yaw_rad = normalizeRadAngle(refine_output.yaw_rad - refine_input.initial_yaw_rad);
+            rec.initial_xyz_gimbal = initial_pose.xyz_gimbal;
+            rec.final_xyz_gimbal = final_pose.xyz_gimbal;
+            rec.delta_xyz_gimbal = final_pose.xyz_gimbal - initial_pose.xyz_gimbal;
+            rec.initial_yaw_rad = initial_pose.ypr_gimbal.x();
+            rec.final_yaw_rad = final_pose.ypr_gimbal.x();
+            rec.delta_yaw_rad = normalizeRadAngle(rec.final_yaw_rad - rec.initial_yaw_rad);
             rec.initial_reprojection_error_px = initial_error;
             rec.final_reprojection_error_px = refine_output.reprojection_error_px;
             rec.delta_reprojection_error_px = initial_error - refine_output.reprojection_error_px;
@@ -144,55 +150,47 @@ namespace armor_detector {
     PoseSolver::createPnPCandidates(const std::vector<cv::Point3f> &object_points,
                                     const std::vector<cv::Point2f> &image_points) const {
 
+        const cv::Mat camera_mat(camera_matrix_);
+        const cv::Mat distortion_mat = distortionMat(distortion_coefficients_);
+
         std::vector<cv::Mat> ippe_rvecs, ippe_tvecs;
-        cv::solvePnPGeneric(object_points,
-                            image_points,
-                            camera_matrix_,
-                            distortion_coefficients_,
-                            ippe_rvecs,
-                            ippe_tvecs,
-                            false,
-                            cv::SOLVEPNP_IPPE);
+        cv::solvePnPGeneric(
+            object_points, image_points, camera_mat, distortion_mat, ippe_rvecs, ippe_tvecs, false, cv::SOLVEPNP_IPPE);
 
         std::vector<PnPCandidate> candidates;
         candidates.reserve(ippe_rvecs.size());
         for (std::size_t j = 0; j < ippe_rvecs.size(); ++j) {
             PnPCandidate c;
-            c.rvec = ippe_rvecs[j];
-            c.tvec = ippe_tvecs[j];
+            c.rvec = pose::matToVec3d(ippe_rvecs[j]);
+            c.tvec = pose::matToVec3d(ippe_tvecs[j]);
 
-            cv::Mat rmat;
-            cv::Rodrigues(c.rvec, rmat);
-            Eigen::Matrix3d R;
-            cv::cv2eigen(rmat, R);
-            c.yaw = tools::calculateYPR(R).x();
+            const Eigen::Matrix3d R_gimbal_armor = R_GIMBAL_CAMERA * pose::rotationMatrixFromRvec(c.rvec);
+            c.yaw = tools::calculateYPR(R_gimbal_armor).x();
             c.world_pitch = calculateWorldPitchFromRvec(c.rvec);
             c.reprojection_error = calculateReprojectionError(object_points, image_points, c.rvec, c.tvec);
             candidates.push_back(c);
         }
 
         if (candidates.empty()) {
-            PnPCandidate c;
-            cv::solvePnP(object_points,
-                         image_points,
-                         camera_matrix_,
-                         distortion_coefficients_,
-                         c.rvec,
-                         c.tvec,
-                         false,
-                         cv::SOLVEPNP_ITERATIVE);
-            cv::Mat rmat;
-            cv::Rodrigues(c.rvec, rmat);
-            Eigen::Matrix3d R;
-            cv::cv2eigen(rmat, R);
-            c.yaw = tools::calculateYPR(R).x();
-            c.world_pitch = calculateWorldPitchFromRvec(c.rvec);
-            c.reprojection_error = calculateReprojectionError(object_points, image_points, c.rvec, c.tvec);
-            candidates.push_back(c);
+            cv::Mat rvec;
+            cv::Mat tvec;
+            const bool solved = cv::solvePnP(
+                object_points, image_points, camera_mat, distortion_mat, rvec, tvec, false, cv::SOLVEPNP_ITERATIVE);
+            if (solved) {
+                PnPCandidate c;
+                c.rvec = pose::matToVec3d(rvec);
+                c.tvec = pose::matToVec3d(tvec);
+                const Eigen::Matrix3d R_gimbal_armor = R_GIMBAL_CAMERA * pose::rotationMatrixFromRvec(c.rvec);
+                c.yaw = tools::calculateYPR(R_gimbal_armor).x();
+                c.world_pitch = calculateWorldPitchFromRvec(c.rvec);
+                c.reprojection_error = calculateReprojectionError(object_points, image_points, c.rvec, c.tvec);
+                candidates.push_back(c);
+            }
         }
 
         return candidates;
     }
+
     // ===================== 候选选择 =====================
 
     std::size_t PoseSolver::selectByGeometry(const std::vector<PnPCandidate> &candidates) {
@@ -274,104 +272,26 @@ namespace armor_detector {
 
     // ===================== 工具方法 =====================
 
-    double PoseSolver::calculateWorldPitchFromRvec(const cv::Mat &rvec) {
-        cv::Mat rmat;
-        cv::Rodrigues(rvec, rmat);
-        Eigen::Matrix3d R_camera_armor;
-        cv::cv2eigen(rmat, R_camera_armor);
-        Eigen::Matrix3d R_world_armor = R_GIMBAL_CAMERA * R_camera_armor;
+    double PoseSolver::calculateWorldPitchFromRvec(const cv::Vec3d &rvec) {
+        const Eigen::Matrix3d R_world_armor = R_GIMBAL_CAMERA * pose::rotationMatrixFromRvec(rvec);
         return tools::calculateYPR(R_world_armor).y();
     }
 
     double PoseSolver::calculateReprojectionError(const std::vector<cv::Point3f> &object_points,
                                                   const std::vector<cv::Point2f> &image_points,
-                                                  const cv::Mat &rvec,
-                                                  const cv::Mat &tvec) const {
-
-        std::vector<cv::Point2f> projected;
-        cv::projectPoints(object_points, rvec, tvec, camera_matrix_, distortion_coefficients_, projected);
-        double error = 0.0;
-        for (std::size_t j = 0; j < image_points.size(); ++j) {
-            error += cv::norm(image_points[j] - projected[j]);
-        }
-        return error;
+                                                  const cv::Vec3d &rvec,
+                                                  const cv::Vec3d &tvec) const {
+        return pose::calculateReprojectionError(
+            object_points, image_points, rvec, tvec, camera_matrix_, distortion_coefficients_);
     }
 
-    // ===================== 重投影 =====================
-
-    std::vector<cv::Point2f>
-    PoseSolver::reprojectArmor(const Eigen::Vector3d &xyz_gimbal, double yaw, ArmorType type) const {
-
-        const auto R_pitch = Eigen::AngleAxisd(ARMOR_PITCH_RAD, Eigen::Vector3d::UnitY()).toRotationMatrix();
-        const auto R_yaw = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
-        const Eigen::Matrix3d R_gimbal_armor = R_yaw * R_pitch;
-
-        Eigen::Matrix3d R_camera_armor = R_CAMERA_GIMBAL * R_gimbal_armor;
-        Eigen::Vector3d t_camera_armor = R_CAMERA_GIMBAL * xyz_gimbal;
-
-        cv::Vec3d rvec_cv;
-        cv::Vec3d tvec_cv;
-        cv::Mat R_cv;
-        cv::eigen2cv(R_camera_armor, R_cv);
-        cv::Rodrigues(R_cv, rvec_cv);
-        cv::eigen2cv(t_camera_armor, tvec_cv);
-
-        const auto &object_points = (type == ArmorType::LARGE) ? LARGE_ARMOR_POINTS : SMALL_ARMOR_POINTS;
-        std::vector<cv::Point2f> image_points;
-        cv::projectPoints(object_points, rvec_cv, tvec_cv, camera_matrix_, distortion_coefficients_, image_points);
-        return image_points;
-    }
-
-    // ===================== 重投影误差计算 =====================
-    double PoseSolver::calculatePoseRefineReprojectionError(const pose::PoseRefineInput & input,
-                                                    const Eigen::Vector3d & xyz_gimbal,
-                                                    double yaw_rad) const
-    {
-        const auto pts = reprojectArmor(xyz_gimbal, yaw_rad, input.armor_type);
-        double error = 0.0;
-        for (int i = 0; i < 4; ++i) {
-            error += cv::norm(pts[i] - input.image_corners[i]);
-        }
-        return error;
-    }
-    SolvedArmor PoseSolver::createSolvedArmorFromPnpInitial(const DetectedArmor &armor,const PnPCandidate & candidate) const
-    {
-        cv::Mat rmat;
-        cv::Rodrigues(candidate.rvec, rmat);
-
-        Eigen::Matrix3d R_camera_armor;
-        Eigen::Vector3d xyz_camera;
-        cv::cv2eigen(rmat, R_camera_armor);
-        cv::cv2eigen(candidate.tvec, xyz_camera);
-
+    SolvedArmor PoseSolver::createSolvedArmorFromRvecTvec(const DetectedArmor &armor,
+                                                          const cv::Vec3d &rvec,
+                                                          const cv::Vec3d &tvec) const {
         SolvedArmor solved;
         solved.geometry = armor.geometry;
         solved.classification = armor.classification;
-
-        solved.pose.xyz_camera = xyz_camera;
-        solved.pose.xyz_gimbal = R_GIMBAL_CAMERA * xyz_camera;
-        solved.pose.ypr_camera = tools::calculateYPR(R_camera_armor);
-
-        Eigen::Matrix3d R_gimbal_armor = R_GIMBAL_CAMERA * R_camera_armor;
-        solved.pose.ypr_gimbal = tools::calculateYPR(R_gimbal_armor);
-        solved.pose.ypd_gimbal = tools::calculateYPD(solved.pose.xyz_gimbal);
-
-        {
-            double yaw = std::atan2(xyz_camera.x(), xyz_camera.z());
-            double pitch = std::atan2(-xyz_camera.y(), std::hypot(xyz_camera.x(), xyz_camera.z()));
-            double distance = xyz_camera.norm();
-            solved.pose.ypd_camera = {yaw, pitch, distance};
-        }
-
-        {
-            const auto & corners = solved.geometry.corners;
-            cv::Point2f target_center = (corners[0] + corners[1] + corners[2] + corners[3]) / 4.0f;
-            double cx = camera_matrix_.at<double>(0, 2);
-            double cy = camera_matrix_.at<double>(1, 2);
-            solved.pose.image_distance_to_center =
-                static_cast<float>(cv::norm(cv::Point2f(cx, cy) - target_center));
-        }
-
+        solved.pose = pose::calculateArmorPose(rvec, tvec, armor.geometry.corners, camera_matrix_);
         return solved;
     }
 

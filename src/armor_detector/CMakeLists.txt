@@ -18,6 +18,7 @@ find_package(Eigen3 REQUIRED)
 find_package(rosbag2_interfaces REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(armor_interfaces REQUIRED)
+find_package(Ceres REQUIRED)
 find_package(OpenVINO REQUIRED COMPONENTS Runtime)
 
 add_executable(armor_detector_node
@@ -26,11 +27,13 @@ add_executable(armor_detector_node
   src/detector/Detector.cpp
   src/CameraProvider.cpp
   src/pose/PoseSolver.cpp
-  src/pose/PoseSearch.cpp
+  src/pose/PoseProjection.cpp
   src/pose/PoseRefineData.cpp
   src/pose/PoseRefineRunner.cpp
   src/pose/NoneRefiner.cpp
   src/pose/YawSearchRefiner.cpp
+  src/pose/PoseOnlyBa6DofRefiner.cpp
+  src/pose/PoseOnlyBa4DofRefiner.cpp
   src/detector/LightDetector.cpp
   src/detector/TraditionalBackend.cpp
   src/detector/LightBarCorrector.cpp
@@ -71,7 +74,7 @@ ament_target_dependencies(armor_detector_node
 )
 
 target_include_directories(armor_detector_node PUBLIC ${EIGEN3_INCLUDE_DIRS})
-target_link_libraries(armor_detector_node ${OpenCV_LIBS} yaml-cpp Eigen3::Eigen openvino::runtime)
+target_link_libraries(armor_detector_node ${OpenCV_LIBS} yaml-cpp Eigen3::Eigen Ceres::ceres openvino::runtime)
 
 install(TARGETS armor_detector_node
   DESTINATION lib/${PROJECT_NAME}

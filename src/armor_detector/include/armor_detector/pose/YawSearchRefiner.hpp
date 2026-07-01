@@ -6,8 +6,7 @@ namespace armor_detector::pose {
 
     class YawSearchRefiner : public IPoseRefiner {
     public:
-        PoseRefineOutput refine(const PoseRefineInput &input,
-                                const PoseErrorFunction &calculate_error) const override;
+        PoseRefineOutput refine(const PoseRefineInput &input) const override;
     };
 
 } // namespace armor_detector::pose

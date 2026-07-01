@@ -28,13 +28,15 @@ def find_target_csv(log_root):
     return results
 
 
-def read_xy(csv_path):
+def read_xy(csv_path, max_frames=0):
     xs, ys, ts = [], [], []
     with open(csv_path) as f:
         for row in csv.DictReader(f):
             xs.append(float(row["center_x_px"]))
             ys.append(float(row["center_y_px"]))
             ts.append(int(row["frame_index"]))
+            if 0 < max_frames <= len(xs):
+                break
     points = np.column_stack([np.array(xs), np.array(ys)])
     times = np.array(ts, dtype=float)
     return points, times
@@ -56,18 +58,16 @@ def filter_outliers(points, times, cx, cy, r, sigma=2.0):
     return points[mask], times[mask], mask
 
 
-def plot_ls(points, filtered, times, cx, cy, r, n_total, save_path):
+def plot_ls(points, filtered, cx, cy, r, n_total, save_path):
     fig, ax = plt.subplots(figsize=(10, 10))
 
     # Circle
     theta = np.linspace(0, 2 * np.pi, 400)
     ax.plot(cx + r * np.cos(theta), cy + r * np.sin(theta), "r-", lw=2.5, zorder=3)
 
-    # Points colored by time
-    sc = ax.scatter(filtered[:, 0], filtered[:, 1], s=10, c=times, cmap="plasma",
-                    alpha=0.7, label=f"inliers ({len(filtered)}/{n_total})", zorder=2)
-    cbar = plt.colorbar(sc, ax=ax, label="frame index")
-    cbar.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0f}"))
+    # Points
+    ax.scatter(filtered[:, 0], filtered[:, 1], s=10, color="blue",
+               alpha=0.7, label=f"inliers ({len(filtered)}/{n_total})", zorder=2)
 
     # Center
     ax.plot(cx, cy, "rx", markersize=15, mew=3, zorder=4)
@@ -103,6 +103,8 @@ def main():
                         help="Output filename prefix")
     parser.add_argument("--sigma", type=float, default=2.0,
                         help="Outlier threshold in sigma (default=2.0)")
+    parser.add_argument("--max-frames", "-n", type=int, default=0,
+                        help="Max frames to read (0=all)")
     args = parser.parse_args()
 
     log_root = os.path.join(os.path.dirname(__file__), "log")
@@ -127,13 +129,21 @@ def main():
 
     video, method, csv_path = chosen
     print(f"Processing: {video}/{method}")
-    points, times = read_xy(csv_path)
+    max_frames = args.max_frames
+    if max_frames == 0:
+        try:
+            inp = input("Frames to read (0=all, Enter=all): ").strip()
+            if inp:
+                max_frames = int(inp)
+        except (ValueError, EOFError):
+            max_frames = 0
+    points, times = read_xy(csv_path, max_frames)
     print(f"Loaded {len(points)} points")
 
     cx, cy, r = fit_circle_ls(points)
     print(f"LS: center=({cx:.2f}, {cy:.2f}), radius={r:.2f}")
 
-    filtered, ftimes, mask = filter_outliers(points, times, cx, cy, r, args.sigma)
+    filtered, _ftimes, mask = filter_outliers(points, times, cx, cy, r, args.sigma)
     n_out = int((~mask).sum())
     if n_out:
         print(f"Filtered {n_out} outliers (sigma={args.sigma})")
@@ -142,7 +152,7 @@ def main():
     prefix = args.prefix if args.prefix else str(len(points))
     fname = f"{prefix}_xy_distribution.png"
     save_path = os.path.join(save_dir, fname)
-    plot_ls(points, filtered, ftimes, cx, cy, r, len(points), save_path)
+    plot_ls(points, filtered, cx, cy, r, len(points), save_path)
 
 
 if __name__ == "__main__":

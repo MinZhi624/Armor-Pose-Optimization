@@ -29,8 +29,8 @@ namespace armor_detector {
 
     private:
         struct PnPCandidate {
-            cv::Mat rvec;
-            cv::Mat tvec;
+            cv::Vec3d rvec = {0.0, 0.0, 0.0};
+            cv::Vec3d tvec = {0.0, 0.0, 0.0};
             double yaw = 0.0;
             double world_pitch = 0.0;
             double reprojection_error = 0.0;
@@ -40,10 +40,11 @@ namespace armor_detector {
             cv::Point2f center;
         };
 
-        
-        SolvedArmor createSolvedArmorFromPnpInitial(const DetectedArmor & armor, const PnPCandidate & candidate) const;
+
+        SolvedArmor
+        createSolvedArmorFromRvecTvec(const DetectedArmor &armor, const cv::Vec3d &rvec, const cv::Vec3d &tvec) const;
         std::vector<PnPCandidate> createPnPCandidates(const std::vector<cv::Point3f> &object_points,
-                                                       const std::vector<cv::Point2f> &image_points) const;
+                                                      const std::vector<cv::Point2f> &image_points) const;
 
         static std::size_t selectByGeometry(const std::vector<PnPCandidate> &candidates);
         static std::size_t selectByYawContinuity(const std::vector<PnPCandidate> &candidates, double nearest_yaw);
@@ -52,20 +53,14 @@ namespace armor_detector {
                                         const cv::Point2f &target_center) const;
 
         double calculateReprojectionError(const std::vector<cv::Point3f> &object_points,
-                                           const std::vector<cv::Point2f> &image_points,
-                                           const cv::Mat &rvec,
-                                           const cv::Mat &tvec) const;
+                                          const std::vector<cv::Point2f> &image_points,
+                                          const cv::Vec3d &rvec,
+                                          const cv::Vec3d &tvec) const;
 
-        static double calculateWorldPitchFromRvec(const cv::Mat &rvec);
+        static double calculateWorldPitchFromRvec(const cv::Vec3d &rvec);
 
-        double calculatePoseRefineReprojectionError(const pose::PoseRefineInput & input,
-                                                    const Eigen::Vector3d & xyz_gimbal,
-                                                    double yaw_rad) const;
-
-        std::vector<cv::Point2f> reprojectArmor(const Eigen::Vector3d &xyz_gimbal, double yaw, ArmorType type) const;
-
-        cv::Mat camera_matrix_;
-        cv::Mat distortion_coefficients_;
+        cv::Matx33d camera_matrix_ = cv::Matx33d::eye();
+        cv::Vec<double, 5> distortion_coefficients_ = {0.0, 0.0, 0.0, 0.0, 0.0};
         Eigen::Matrix3d R_gimbal_world_ = Eigen::Matrix3d::Identity();
         std::unordered_map<int, std::vector<LastArmorYawRecord>> record_;
         debug::PoseDebugData pose_debug_;

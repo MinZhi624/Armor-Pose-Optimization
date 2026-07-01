@@ -4,8 +4,8 @@
 
 This repository contains one ROS 2 package, `armor_detector`, for RoboMaster armor plate detection.
 
-- `src/armor_detector/include/armor_detector/`: public headers, organized by component (`detector/`, `debug/`, `types/`, `tools/`, `yaw/`).
-- `src/armor_detector/src/`: C++ implementations for the node, camera provider, detector pipeline, pose solver, yaw search, and debug UI.
+- `src/armor_detector/include/armor_detector/`: public headers, organized by component (`detector/`, `debug/`, `types/`, `tools/`, `pose/`).
+- `src/armor_detector/src/`: C++ implementations for the node, camera provider, detector pipeline, pose solver, pose refinement, and debug UI.
 - `src/armor_detector/config/`: runtime YAML configuration, including camera calibration and playback settings.
 - `src/armor_detector/model/`: ONNX/IR model files (yolo, number_cnn, robot_0526).
 - `src/armor_detector/launch/`: ROS 2 launch files — `run.launch.py` (interactive, realtime playback) and `auto_test.launch.py` (headless, step playback).

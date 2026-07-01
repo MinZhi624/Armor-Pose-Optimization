@@ -11,6 +11,7 @@
   <depend>rosbag2_interfaces</depend>
   <depend>visualization_msgs</depend>
   <depend>armor_interfaces</depend>
+  <depend>ceres-solver</depend>
   <exec_depend>foxglove_bridge</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>

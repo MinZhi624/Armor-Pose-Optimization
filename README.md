@@ -88,7 +88,7 @@ src/armor_detector/
     detector/                # 检测后端接口和实现
     tools/                   # 坐标变换、几何常量
     types/                   # 数据结构定义
-    yaw/                     # yaw 搜索算法
+    pose/                    # 位姿求解与优化（PoseSolver、PoseRefine、PoseSearch）
   launch/
     run.launch.py            # 交互模式 launch（支持 video:= 参数切换视频）
     auto_test.launch.py      # 无头自动测试 launch
@@ -96,7 +96,7 @@ src/armor_detector/
   src/
     debug/                   # Debug observer 实现
     detector/                # 检测算法实现
-    yaw/                     # yaw 搜索实现
+    pose/                    # 位姿求解与优化实现
   Test/video/                # 测试用 rosbag 数据 (video1~video7)
 docs/                        # 设计文档和约定
 ```

@@ -236,9 +236,9 @@
 
 ### 对应代码
 
-- 头文件：`include/armor_detector/yaw/YawSearch.hpp`
-- 实现文件：`src/yaw/YawSearch.cpp`
-- 主要函数：`runYawSearch(center_yaw, error_func)`
+- 头文件：`include/armor_detector/pose/PoseSearch.hpp`
+- 实现文件：`src/pose/PoseSearch.cpp`
+- 主要函数：`refineYawFromPnp(center_yaw, error_func)`
 
 ## YOLO / RobotDetectionModel 检测
 

@@ -1,5 +1,5 @@
 #include "armor_detector/pose/PoseRefineRunner.hpp"
-#include "armor_detector/tools/angle.hpp"
+#include "armor_detector/pose/PoseProjection.hpp"
 
 namespace armor_detector::pose {
 
@@ -15,25 +15,33 @@ namespace armor_detector::pose {
         return toString(method_);
     }
 
-    PoseRefineOutput PoseRefineRunner::refine(const PoseRefineInput &input,
-                                              const PoseErrorFunction &calculate_error) const {
+    PoseRefineOutput PoseRefineRunner::refine(const PoseRefineInput &input) const {
         switch (method_) {
             case PoseRefineMethod::NONE:
-                return none_refiner_.refine(input, calculate_error);
+                return none_refiner_.refine(input);
             case PoseRefineMethod::YAW_SEARCH:
-                return yaw_search_refiner_.refine(input, calculate_error);
+                return yaw_search_refiner_.refine(input);
+            case PoseRefineMethod::POSE_ONLY_BA_6DOF:
+                return pose_only_ba_6dof_refiner_.refine(input);
+            case PoseRefineMethod::POSE_ONLY_BA_4DOF:
+                return pose_only_ba_4dof_refiner_.refine(input);
         }
+
         PoseRefineOutput output;
-        output.xyz_gimbal = input.initial_xyz_gimbal;
-        output.yaw_rad = input.initial_yaw_rad;
+        output.rvec = input.initial_rvec;
+        output.tvec = input.initial_tvec;
         output.success = false;
-        output.reprojection_error_px = calculate_error(input.initial_xyz_gimbal, input.initial_yaw_rad);
+        output.reprojection_error_px = calculateInitialError(input);
         return output;
     }
 
-    double PoseRefineRunner::calculateInitialError(const PoseRefineInput &input,
-                                                   const PoseErrorFunction &calculate_error) const {
-        return calculate_error(input.initial_xyz_gimbal, input.initial_yaw_rad);
+    double PoseRefineRunner::calculateInitialError(const PoseRefineInput &input) const {
+        return calculateReprojectionError(input.armor_type,
+                                          input.image_corners,
+                                          input.initial_rvec,
+                                          input.initial_tvec,
+                                          input.camera_matrix,
+                                          input.distortion_coefficients);
     }
 
 } // namespace armor_detector::pose
