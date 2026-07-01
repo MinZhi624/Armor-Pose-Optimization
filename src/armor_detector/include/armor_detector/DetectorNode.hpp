@@ -7,6 +7,7 @@
 #include "armor_detector/debug/DebugHub.hpp"
 #include "armor_detector/debug/DebugLayerState.hpp"
 #include "armor_detector/debug/DebugPoseMarkerPublisher.hpp"
+#include "armor_detector/pose/PoseRefineRunner.hpp"
 #include "armor_detector/detector/Detector.hpp"
 
 #include <rclcpp/rclcpp.hpp>
@@ -35,6 +36,14 @@ namespace armor_detector {
         bool pose = false;
         bool result = true;
         std::size_t stats_interval = 50;
+
+        // Pose refine CSV
+        bool pose_refine_csv_enabled = false;
+        std::string pose_refine_csv_root_dir;
+        std::string pose_refine_csv_video = "manual";
+
+        // Pose refine topic
+        bool pose_refine_topic_enabled = true;
     };
 
     /**
@@ -60,6 +69,7 @@ namespace armor_detector {
         // 检测组件
         CameraProvider camera_provider_;
         PoseSolver pose_solver_;
+        pose::PoseRefineRunner pose_refiner_;
 
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
 

@@ -124,9 +124,28 @@ namespace armor_detector::debug {
 
     struct PoseRefineDebugRecord {
         std::size_t armor_index = 0;
+
+        int armor_name = 0;
+        std::string armor_type;
+        double confidence = 0.0;
+
+        double center_x_px = 0.0;
+        double center_y_px = 0.0;
+
         std::string method;
         bool success = false;
-        double reprojection_error_px = 0.0;
+
+        Eigen::Vector3d initial_xyz_gimbal = Eigen::Vector3d::Zero();
+        Eigen::Vector3d final_xyz_gimbal = Eigen::Vector3d::Zero();
+        Eigen::Vector3d delta_xyz_gimbal = Eigen::Vector3d::Zero();
+
+        double initial_yaw_rad = 0.0;
+        double final_yaw_rad = 0.0;
+        double delta_yaw_rad = 0.0;
+
+        double initial_reprojection_error_px = 0.0;
+        double final_reprojection_error_px = 0.0;
+        double delta_reprojection_error_px = 0.0;
     };
 
     struct PoseDebugData {

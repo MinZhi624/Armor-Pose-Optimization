@@ -17,6 +17,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(rosbag2_interfaces REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(armor_interfaces REQUIRED)
 find_package(OpenVINO REQUIRED COMPONENTS Runtime)
 
 add_executable(armor_detector_node
@@ -27,6 +28,9 @@ add_executable(armor_detector_node
   src/PoseSolver.cpp
   src/pose/PoseSearch.cpp
   src/pose/PoseRefineData.cpp
+  src/pose/PoseRefineRunner.cpp
+  src/pose/NoneRefiner.cpp
+  src/pose/YawSearchRefiner.cpp
   src/detector/LightDetector.cpp
   src/detector/TraditionalBackend.cpp
   src/detector/LightBarCorrector.cpp
@@ -46,6 +50,8 @@ add_executable(armor_detector_node
   src/debug/DebugYolo.cpp
   src/debug/DebugCornerCorrectionView.cpp
   src/debug/DebugPoseRefineStats.cpp
+  src/debug/DebugPoseRefineCsvWriter.cpp
+  src/debug/DebugPoseRefineTopicPublisher.cpp
   src/detector/YoloBackend.cpp
 )
 
@@ -61,6 +67,7 @@ ament_target_dependencies(armor_detector_node
   sensor_msgs
   rosbag2_interfaces
   visualization_msgs
+  armor_interfaces
 )
 
 target_include_directories(armor_detector_node PUBLIC ${EIGEN3_INCLUDE_DIRS})

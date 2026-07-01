@@ -1,7 +1,7 @@
 #pragma once
 
 #include "armor_detector/debug/DebugData.hpp"
-#include "armor_detector/pose/PoseRefineData.hpp"
+#include "armor_detector/pose/PoseRefineRunner.hpp"
 #include "armor_detector/types/ArmorData.hpp"
 #include "armor_detector/types/CameraInfo.hpp"
 
@@ -20,11 +20,9 @@ namespace armor_detector {
         PoseSolver(const CameraInfo &camera_info);
 
         void init(const CameraInfo &camera_info);
-        void setRefineMethod(pose::PoseRefineMethod method) {
-            refine_method_ = method;
-        }
 
-        std::vector<SolvedArmor> solve(const std::vector<DetectedArmor> &armors);
+        std::vector<SolvedArmor> solve(const std::vector<DetectedArmor> &armors,
+                                       const pose::PoseRefineRunner &pose_refiner);
         const debug::PoseDebugData &getPoseDebugData() const {
             return pose_debug_;
         }
@@ -42,10 +40,10 @@ namespace armor_detector {
             cv::Point2f center;
         };
 
- 
+        
         SolvedArmor createSolvedArmorFromPnpInitial(const DetectedArmor & armor, const PnPCandidate & candidate) const;
         std::vector<PnPCandidate> createPnPCandidates(const std::vector<cv::Point3f> &object_points,
-                                                      const std::vector<cv::Point2f> &image_points) const;
+                                                       const std::vector<cv::Point2f> &image_points) const;
 
         static std::size_t selectByGeometry(const std::vector<PnPCandidate> &candidates);
         static std::size_t selectByYawContinuity(const std::vector<PnPCandidate> &candidates, double nearest_yaw);
@@ -54,15 +52,12 @@ namespace armor_detector {
                                         const cv::Point2f &target_center) const;
 
         double calculateReprojectionError(const std::vector<cv::Point3f> &object_points,
-                                          const std::vector<cv::Point2f> &image_points,
-                                          const cv::Mat &rvec,
-                                          const cv::Mat &tvec) const;
+                                           const std::vector<cv::Point2f> &image_points,
+                                           const cv::Mat &rvec,
+                                           const cv::Mat &tvec) const;
 
         static double calculateWorldPitchFromRvec(const cv::Mat &rvec);
 
-        pose::PoseRefineOutput refinePoseFromPnpInitial(const pose::PoseRefineInput & input,
-                                                    pose::PoseRefineMethod method) const;
-        pose::PoseRefineOutput refineYawFromPnpInitial(const pose::PoseRefineInput & input) const;
         double calculatePoseRefineReprojectionError(const pose::PoseRefineInput & input,
                                                     const Eigen::Vector3d & xyz_gimbal,
                                                     double yaw_rad) const;
@@ -74,7 +69,6 @@ namespace armor_detector {
         Eigen::Matrix3d R_gimbal_world_ = Eigen::Matrix3d::Identity();
         std::unordered_map<int, std::vector<LastArmorYawRecord>> record_;
         debug::PoseDebugData pose_debug_;
-        pose::PoseRefineMethod refine_method_ = pose::PoseRefineMethod::YAW_SEARCH;
     };
 
 } // namespace armor_detector

@@ -8,6 +8,8 @@
 #include "armor_detector/debug/DebugResult.hpp"
 #include "armor_detector/debug/DebugTiming.hpp"
 #include "armor_detector/debug/DebugPoseRefineStats.hpp"
+#include "armor_detector/debug/DebugPoseRefineCsvWriter.hpp"
+#include "armor_detector/debug/DebugPoseRefineTopicPublisher.hpp"
 #include "armor_detector/debug/DebugYolo.hpp"
 #include "armor_detector/pose/PoseRefineData.hpp"
 
@@ -64,6 +66,14 @@ namespace armor_detector {
         debug_config_.result = this->declare_parameter<bool>("debug.result", true);
         debug_config_.stats_interval =
             static_cast<std::size_t>(this->declare_parameter<int>("debug.stats_interval", 50));
+        debug_config_.pose_refine_csv_enabled =
+            this->declare_parameter<bool>("debug.pose_refine_csv.enabled", false);
+        debug_config_.pose_refine_csv_root_dir =
+            this->declare_parameter<std::string>("debug.pose_refine_csv.root_dir", "");
+        debug_config_.pose_refine_csv_video =
+            this->declare_parameter<std::string>("debug.pose_refine_csv.video", "manual");
+        debug_config_.pose_refine_topic_enabled =
+            this->declare_parameter<bool>("debug.pose_refine_topic.enabled", true);
 
         // Playback 配置
         std::string playback_mode = this->declare_parameter<std::string>("playback.mode", "realtime");
@@ -83,7 +93,7 @@ namespace armor_detector {
         // --- PoseSolver ---
         const auto refine_method_name = this->declare_parameter<std::string>("pose.refine_method", "yaw_search");
         const auto refine_method = pose::poseRefineMethodFromString(refine_method_name);
-        pose_solver_.setRefineMethod(refine_method);
+        pose_refiner_.setMethod(refine_method);
         RCLCPP_INFO(this->get_logger(),
               "位姿估计方法: %s",
               pose::toString(refine_method).c_str());
@@ -252,6 +262,17 @@ namespace armor_detector {
         debug_hub_.addObserver(std::make_shared<debug::DebugPoseMarkerPublisher>(*this, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugPoseRefineStats>(debug_config_.stats_interval));
 
+        if (debug_config_.pose_refine_csv_enabled) {
+            debug_hub_.addObserver(std::make_shared<debug::DebugPoseRefineCsvWriter>(
+                debug_config_.pose_refine_csv_root_dir,
+                debug_config_.pose_refine_csv_video,
+                pose_refiner_.methodName()));
+        }
+
+        if (debug_config_.pose_refine_topic_enabled) {
+            debug_hub_.addObserver(std::make_shared<debug::DebugPoseRefineTopicPublisher>(*this, layer_state_));
+        }
+
         // GUI observer：仅 debug.show=true 时注册
         if (!debug_config_.show) {
             RCLCPP_INFO(this->get_logger(), "Debug GUI 已禁用 (debug.show=false)");
@@ -310,7 +331,7 @@ namespace armor_detector {
         debug_hub_.onDetection(ctx, result.debug);
         debug_hub_.onCornerCorrection(ctx, result.debug.corner_correction);
 
-        auto solved = pose_solver_.solve(result.armors);
+        auto solved = pose_solver_.solve(result.armors, pose_refiner_);
         debug_hub_.onPoseSolved(ctx, pose_solver_.getPoseDebugData());
 
         debug_hub_.onFrameEnd(ctx);
@@ -351,6 +372,13 @@ namespace armor_detector {
             [this](rclcpp::Client<rosbag2_interfaces::srv::PlayNext>::SharedFuture future) {
                 play_next_in_flight_ = false;
                 if (!future.get()->success) {
+                    // 实验完整播放场景：rosbag 播完不算错误
+                    if (processed_frame_count_ > 0 && exit_on_complete_ && max_frames_ == 0) {
+                        RCLCPP_INFO(this->get_logger(),
+                                    "rosbag 播完 (共 %zu 帧), 正常退出", processed_frame_count_);
+                        rclcpp::shutdown();
+                        return;
+                    }
                     RCLCPP_ERROR(this->get_logger(), "play_next 失败 (frame=%zu)", processed_frame_count_);
                     rclcpp::shutdown();
                     return;

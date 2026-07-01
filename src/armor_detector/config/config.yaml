@@ -93,6 +93,14 @@ armor_detector_node_cpp:
       corner_correction: false # 6键: 角点修正对比（原始→修正）
       pose: true              # 5键: /armor_markers 发布
       result: true            # 0键: 最终装甲板 X 标记
+      # PoseRefine CSV 输出（默认关闭，实验 launch 强制开启）
+      pose_refine_csv:
+        enabled: false
+        root_dir: ""
+        video: "manual"
+      # PoseRefine topic 输出（默认开启，跟 debug.pose 图层绑定）
+      pose_refine_topic:
+        enabled: true
       # 耗时统计打印间隔（帧数）
       stats_interval: 50
 

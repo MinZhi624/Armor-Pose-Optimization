@@ -1,10 +1,8 @@
 #include "armor_detector/PoseSolver.hpp"
-#include "armor_detector/pose/PoseRefineData.hpp"
 #include "armor_detector/tools/angle.hpp"
 #include "armor_detector/tools/armor_geometry.hpp"
 #include "armor_detector/tools/geometry.hpp"
 #include "armor_detector/tools/transform.hpp"
-#include "armor_detector/pose/PoseSearch.hpp"
 
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
@@ -43,7 +41,8 @@ namespace armor_detector {
 
     // ===================== 主流程 =====================
 
-    std::vector<SolvedArmor> PoseSolver::solve(const std::vector<DetectedArmor> &armors) {
+    std::vector<SolvedArmor> PoseSolver::solve(const std::vector<DetectedArmor> &armors,
+                                               const pose::PoseRefineRunner &pose_refiner) {
         pose_debug_.refine_records.clear();
         pose_debug_.solved_armors.clear();
         pose_debug_.timings.clear();
@@ -79,7 +78,7 @@ namespace armor_detector {
             std::size_t best_id = selectBestCandidate(candidates, armor_name_key, target_center);
 
             SolvedArmor solved = createSolvedArmorFromPnpInitial(classified, candidates[best_id]);
-            
+
             auto pnp_end = std::chrono::steady_clock::now();
             pnp_elapsed_ms += std::chrono::duration<double, std::milli>(pnp_end - pnp_start).count();
 
@@ -91,19 +90,39 @@ namespace armor_detector {
             refine_input.initial_yaw_rad = solved.pose.ypr_gimbal.x();
             refine_input.armor_type = classified.geometry.type;
 
-            const auto refine_output = refinePoseFromPnpInitial(refine_input, refine_method_);
+            auto error_func = [&](const Eigen::Vector3d &xyz_gimbal, double yaw_rad) -> double {
+                return calculatePoseRefineReprojectionError(refine_input, xyz_gimbal, yaw_rad);
+            };
+
+            const double initial_error = pose_refiner.calculateInitialError(refine_input, error_func);
+            const auto refine_output = pose_refiner.refine(refine_input, error_func);
             if (refine_output.success) {
                 solved.pose.xyz_gimbal = refine_output.xyz_gimbal;
                 solved.pose.ypr_gimbal[0] = refine_output.yaw_rad;
                 solved.pose.ypd_gimbal = tools::calculateYPD(solved.pose.xyz_gimbal);
             }
 
-            pose_debug_.refine_records.push_back({
-                solved_armors.size(),
-                pose::toString(refine_method_),
-                refine_output.success,
-                refine_output.reprojection_error_px
-            });
+            // Fill debug record with full fields
+            debug::PoseRefineDebugRecord rec;
+            rec.armor_index = solved_armors.size();
+            rec.armor_name = static_cast<int>(classified.classification.name);
+            rec.armor_type = (classified.geometry.type == ArmorType::LARGE) ? "large" :
+                             (classified.geometry.type == ArmorType::SMALL) ? "small" : "none";
+            rec.confidence = classified.classification.confidence;
+            rec.center_x_px = target_center.x;
+            rec.center_y_px = target_center.y;
+            rec.method = pose_refiner.methodName();
+            rec.success = refine_output.success;
+            rec.initial_xyz_gimbal = refine_input.initial_xyz_gimbal;
+            rec.final_xyz_gimbal = refine_output.xyz_gimbal;
+            rec.delta_xyz_gimbal = refine_output.xyz_gimbal - refine_input.initial_xyz_gimbal;
+            rec.initial_yaw_rad = refine_input.initial_yaw_rad;
+            rec.final_yaw_rad = refine_output.yaw_rad;
+            rec.delta_yaw_rad = normalizeRadAngle(refine_output.yaw_rad - refine_input.initial_yaw_rad);
+            rec.initial_reprojection_error_px = initial_error;
+            rec.final_reprojection_error_px = refine_output.reprojection_error_px;
+            rec.delta_reprojection_error_px = initial_error - refine_output.reprojection_error_px;
+            pose_debug_.refine_records.push_back(rec);
 
             auto refine_end = std::chrono::steady_clock::now();
             refine_elapsed_ms += std::chrono::duration<double, std::milli>(refine_end - refine_start).count();
@@ -303,7 +322,7 @@ namespace armor_detector {
         return image_points;
     }
 
-    // ===================== Yaw 优化 =====================
+    // ===================== 重投影误差计算 =====================
     double PoseSolver::calculatePoseRefineReprojectionError(const pose::PoseRefineInput & input,
                                                     const Eigen::Vector3d & xyz_gimbal,
                                                     double yaw_rad) const
@@ -314,45 +333,6 @@ namespace armor_detector {
             error += cv::norm(pts[i] - input.image_corners[i]);
         }
         return error;
-    }
-
-    pose::PoseRefineOutput PoseSolver::refinePoseFromPnpInitial(const pose::PoseRefineInput & input,
-                                            pose::PoseRefineMethod method) const
-    {
-        switch (method) {
-            case pose::PoseRefineMethod::NONE : {
-                pose::PoseRefineOutput output;
-                output.yaw_rad = input.initial_yaw_rad;
-                output.xyz_gimbal = input.initial_xyz_gimbal;
-                output.reprojection_error_px = calculatePoseRefineReprojectionError(input, output.xyz_gimbal, output.yaw_rad);
-                output.success = true;
-                return output;
-            }
-            case pose::PoseRefineMethod::YAW_SEARCH : 
-                return refineYawFromPnpInitial(input);
-        }
-
-        pose::PoseRefineOutput output;
-        output.yaw_rad = input.initial_yaw_rad;
-        output.xyz_gimbal = input.initial_xyz_gimbal;
-        output.reprojection_error_px = calculatePoseRefineReprojectionError(input, output.xyz_gimbal, output.yaw_rad);
-        output.success = false;
-        return output;
-    }
-    pose::PoseRefineOutput PoseSolver::refineYawFromPnpInitial(const pose::PoseRefineInput & input) const
-    {
-        pose::PoseRefineOutput output;
-        output.xyz_gimbal = input.initial_xyz_gimbal;
-        output.yaw_rad = input.initial_yaw_rad;
-        output.success = false;
-        auto error_func = [&](double yaw) -> double {
-            return calculatePoseRefineReprojectionError(input, input.initial_xyz_gimbal, yaw);
-        };
-
-        output.yaw_rad = pose::refineYawFromPnp(input.initial_yaw_rad, error_func);
-        output.reprojection_error_px = error_func(output.yaw_rad);
-        output.success = true;
-        return output;
     }
     SolvedArmor PoseSolver::createSolvedArmorFromPnpInitial(const DetectedArmor &armor,const PnPCandidate & candidate) const
     {

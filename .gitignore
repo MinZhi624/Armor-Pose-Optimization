@@ -61,6 +61,8 @@ Daily.md
 .cache/
 temp/
 docs/superpowers/
+debug/pose_refine/log/
+.mimocode/
 # 视屏 
 *.avi
 *.mp4
