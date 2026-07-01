@@ -1,4 +1,4 @@
-#include "armor_detector/PoseSolver.hpp"
+#include "armor_detector/pose/PoseSolver.hpp"
 #include "armor_detector/tools/angle.hpp"
 #include "armor_detector/tools/armor_geometry.hpp"
 #include "armor_detector/tools/geometry.hpp"

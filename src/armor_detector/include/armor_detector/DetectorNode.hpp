@@ -1,7 +1,7 @@
 #pragma once
 
 #include "armor_detector/CameraProvider.hpp"
-#include "armor_detector/PoseSolver.hpp"
+#include "armor_detector/pose/PoseSolver.hpp"
 #include "armor_detector/debug/DebugData.hpp"
 #include "armor_detector/debug/DebugGUI.hpp"
 #include "armor_detector/debug/DebugHub.hpp"

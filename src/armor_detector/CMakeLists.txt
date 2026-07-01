@@ -25,7 +25,7 @@ add_executable(armor_detector_node
   src/detector/ArmorDetector.cpp
   src/detector/Detector.cpp
   src/CameraProvider.cpp
-  src/PoseSolver.cpp
+  src/pose/PoseSolver.cpp
   src/pose/PoseSearch.cpp
   src/pose/PoseRefineData.cpp
   src/pose/PoseRefineRunner.cpp
