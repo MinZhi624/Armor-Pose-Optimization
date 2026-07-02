@@ -9,7 +9,7 @@
 #include <string_view>
 
 namespace armor_detector::pose {
-    enum class PoseRefineMethod { NONE, YAW_SEARCH, POSE_ONLY_BA_6DOF, POSE_ONLY_BA_4DOF };
+    enum class PoseRefineMethod { NONE, YAW_SEARCH, POSE_ONLY_BA_6DOF, POSE_ONLY_BA_4DOF_XYZ, POSE_ONLY_BA_4DOF_YPD };
 
     struct PoseRefineInput {
         std::array<cv::Point2f, 4> image_corners;

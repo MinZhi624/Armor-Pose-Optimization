@@ -23,8 +23,10 @@ namespace armor_detector::pose {
                 return yaw_search_refiner_.refine(input);
             case PoseRefineMethod::POSE_ONLY_BA_6DOF:
                 return pose_only_ba_6dof_refiner_.refine(input);
-            case PoseRefineMethod::POSE_ONLY_BA_4DOF:
-                return pose_only_ba_4dof_refiner_.refine(input);
+            case PoseRefineMethod::POSE_ONLY_BA_4DOF_XYZ:
+                return pose_only_ba_4dof_xyz_refiner_.refine(input);
+            case PoseRefineMethod::POSE_ONLY_BA_4DOF_YPD:
+                return pose_only_ba_4dof_ypd_refiner_.refine(input);
         }
 
         PoseRefineOutput output;

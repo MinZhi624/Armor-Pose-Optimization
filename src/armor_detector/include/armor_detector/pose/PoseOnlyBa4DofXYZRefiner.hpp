@@ -4,7 +4,7 @@
 
 namespace armor_detector::pose {
 
-    class PoseOnlyBa4DofRefiner : public IPoseRefiner {
+    class PoseOnlyBa4DofXYZRefiner : public IPoseRefiner {
     public:
         PoseRefineOutput refine(const PoseRefineInput &input) const override;
     };

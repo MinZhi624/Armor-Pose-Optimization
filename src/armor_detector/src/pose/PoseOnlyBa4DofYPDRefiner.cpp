@@ -1,4 +1,4 @@
-#include "armor_detector/pose/PoseOnlyBa4DofRefiner.hpp"
+#include "armor_detector/pose/PoseOnlyBa4DofYPDRefiner.hpp"
 #include "armor_detector/pose/PoseProjection.hpp"
 #include "armor_detector/tools/armor_geometry.hpp"
 
@@ -22,22 +22,44 @@ namespace armor_detector::pose {
 
             template <typename T>
             bool operator()(const T *const pose, T *residual) const {
-                // pose[0..2]: xyz_gimbal, pose[3]: yaw_gimbal_rad.
-                const Eigen::Matrix<T, 3, 1> p_armor(T(point_3d_.x), T(point_3d_.y), T(point_3d_.z));
 
+                const Eigen::Matrix<T, 3, 1> p_armor(T(point_3d_.x), T(point_3d_.y), T(point_3d_.z));
+                // 旋转
                 const T yaw = pose[3];
                 const T cy = ceres::cos(yaw);
                 const T sy = ceres::sin(yaw);
 
+                const T pitch = T(tools::ARMOR_PITCH_RAD);
+                const T cp = ceres::cos(pitch);
+                const T sp = ceres::sin(pitch);
+
+
                 Eigen::Matrix<T, 3, 3> Rz;
                 Rz << cy, -sy, T(0), sy, cy, T(0), T(0), T(0), T(1);
 
-                const Eigen::Matrix<T, 3, 1> xyz_gimbal(pose[0], pose[1], pose[2]);
-                const Eigen::Matrix<T, 3, 1> p_gimbal = Rz * p_armor + xyz_gimbal;
+                Eigen::Matrix<T, 3, 3> Ry;
+                Ry << cp, T(0), sp, T(0), T(1), T(0), -sp, T(0), cp;
 
-                // gimbal -> camera: x_camera=-y_gimbal, y_camera=-z_gimbal, z_camera=x_gimbal.
+                const Eigen::Matrix<T, 3, 1> ypd_gimbal(pose[0], pose[1], pose[2]);
+                // ypd球面坐标系 -> xyz直角坐标系坐标系
+                const T dir_yaw = pose[0];
+                const T dir_pitch = pose[1];
+                const T dir_distance = pose[2];
+
+                const T cy_dir = ceres::cos(dir_yaw);
+                const T sy_dir = ceres::sin(dir_yaw);
+                const T cp_dir = ceres::cos(dir_pitch);
+                const T sp_dir = ceres::sin(dir_pitch);
+
+                const Eigen::Matrix<T, 3, 1> xyz_gimbal(
+                    dir_distance * cp_dir * cy_dir, dir_distance * cp_dir * sy_dir, dir_distance * sp_dir);
+
+                const Eigen::Matrix<T, 3, 1> p_gimbal = Rz * Ry * p_armor + xyz_gimbal;
+
+                // xyz_gimbal -> xyz_camera
                 const Eigen::Matrix<T, 3, 1> p_camera(-p_gimbal.y(), -p_gimbal.z(), p_gimbal.x());
 
+                // 归一化
                 const T x_pred = p_camera.x() / p_camera.z();
                 const T y_pred = p_camera.y() / p_camera.z();
 
@@ -71,7 +93,7 @@ namespace armor_detector::pose {
         }
     } // namespace
 
-    PoseRefineOutput PoseOnlyBa4DofRefiner::refine(const PoseRefineInput &input) const {
+    PoseRefineOutput PoseOnlyBa4DofYPDRefiner::refine(const PoseRefineInput &input) const {
         PoseRefineOutput output;
         output.rvec = input.initial_rvec;
         output.tvec = input.initial_tvec;
@@ -102,10 +124,11 @@ namespace armor_detector::pose {
 
         const ArmorPose initial_pose =
             calculateArmorPose(input.initial_rvec, input.initial_tvec, input.image_corners, input.camera_matrix);
-        double pose[4] = {initial_pose.xyz_gimbal.x(),
-                          initial_pose.xyz_gimbal.y(),
-                          initial_pose.xyz_gimbal.z(),
-                          initial_pose.ypr_gimbal.x()};
+        // Pose 优化变量: dir_yaw_gimbal, dir_pitch_gimbal, dir_distance_gimbal, pose_yaw.
+        double pose[4] = {initial_pose.ypd_gimbal.x(), // dir_yaw_gimbal
+                          initial_pose.ypd_gimbal.y(), // dir_pitch_gimbal
+                          initial_pose.ypd_gimbal.z(), // dir_distance_gimbal
+                          initial_pose.ypr_gimbal.x()}; // pose_yaw
         if (!isFinitePose4D(pose)) {
             return output;
         }
@@ -134,7 +157,7 @@ namespace armor_detector::pose {
 
         cv::Vec3d refined_rvec;
         cv::Vec3d refined_tvec;
-        rvecTvecFromGimbalXyzYaw(Eigen::Vector3d(pose[0], pose[1], pose[2]), pose[3], refined_rvec, refined_tvec);
+        rvecTvecFromGimbalYpdYaw(Eigen::Vector3d(pose[0], pose[1], pose[2]), pose[3], refined_rvec, refined_tvec);
 
         const double refined_error_px = calculateReprojectionError(input.armor_type,
                                                                    input.image_corners,

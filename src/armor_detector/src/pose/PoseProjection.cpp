@@ -56,6 +56,11 @@ namespace armor_detector::pose {
         cv::eigen2cv(xyz_camera, tvec);
     }
 
+    void rvecTvecFromGimbalYpdYaw(const Eigen::Vector3d &ypd_gimbal, double yaw_rad, cv::Vec3d &rvec, cv::Vec3d &tvec) {
+        const Eigen::Vector3d xyz_gimbal = tools::calculateXYZ(ypd_gimbal);
+        rvecTvecFromGimbalXyzYaw(xyz_gimbal, yaw_rad, rvec, tvec);
+    }
+
     std::vector<cv::Point2f> projectArmor(const std::vector<cv::Point3f> &object_points,
                                           const cv::Vec3d &rvec,
                                           const cv::Vec3d &tvec,

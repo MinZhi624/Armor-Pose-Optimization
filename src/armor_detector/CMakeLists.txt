@@ -33,7 +33,8 @@ add_executable(armor_detector_node
   src/pose/NoneRefiner.cpp
   src/pose/YawSearchRefiner.cpp
   src/pose/PoseOnlyBa6DofRefiner.cpp
-  src/pose/PoseOnlyBa4DofRefiner.cpp
+  src/pose/PoseOnlyBa4DofXYZRefiner.cpp
+  src/pose/PoseOnlyBa4DofYPDRefiner.cpp
   src/detector/LightDetector.cpp
   src/detector/TraditionalBackend.cpp
   src/detector/LightBarCorrector.cpp
