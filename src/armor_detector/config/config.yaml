@@ -4,38 +4,30 @@ armor_detector_node_cpp:
     detector:
       # 后端类型: "traditional"（传统轮廓检测）/ "yolo"（YOLO 神经网络）
       backend: "yolo"
-      # 目标灯条颜色: "RED"（攻击红方）/ "BLUE"（攻击蓝方）
+      # 目标灯条颜色: "RED"/ "BLUE"
       target_color: "RED"
 
       # --------------- 角点修正 ---------------
       corner_correction:
-        # 是否启用角点修正（true/false）
-        enabled: true
         # 灯条修正方法:
-        #   "fit_ellipse"      — 椭圆拟合，推荐，速度和精度均衡
-        #   "min_area_rect"    — 最小外接矩形，最快但精度略低
-        #   "pca_gradient"     — PCA + 亮度跳变，精度最高但较慢
+        #   "none": 
+        #   "fit_ellipse"      
+        #   "min_area_rect"    
+        #   "pca_gradient"    
         method: "pca_gradient"
-        # ROI 扩展倍率（相对于装甲板四角包围框，1.0=不扩展，1.25=扩展25%）
         roi_scale: 1.25
-        # ROI 内二值化灰度阈值（0-255），越低越敏感
         gray_threshold: 100
-        # 修正后四角与原始四角的最大允许距离和（像素），超过则回退原始角点
         max_endpoint_distance_px: 15.0
-        # 装甲板末端几何合理性检查；不通过会从最终输出中过滤
         geometry:
           enabled: true
-          # 比传统灯条配对更宽松，用于兜底 YOLO 明显误检
           max_angle_diff_deg: 15.0
           min_length_ratio: 0.45
           min_x_diff_ratio: 0.45
           max_y_diff_ratio: 1.5
           min_distance_ratio: 0.05
           max_distance_ratio: 1.2
-        # ROI 内灯条候选的几何筛选参数
         light:
           min_contours_area: 30
-          # 灯条短边/长边比值范围（灯条应为细长形状）
           min_contours_ratio: 0.06
           max_contours_ratio: 0.5
 
@@ -76,7 +68,11 @@ armor_detector_node_cpp:
           height: -1
     # ------------------- Pose ----------------------
     pose:
-      # 位姿矫正方法: "pose_only_ba_6dof", "pose_only_ba_4dof", "yaw_search", "none"
+      # 位姿矫正方法:
+      # "pose_only_ba_6dof",
+      # "pose_only_ba_4dof",
+      # "yaw_search",
+      # "none"
       refine_method: "pose_only_ba_4dof"
     # ==================== Debug ====================
     debug:
@@ -86,22 +82,20 @@ armor_detector_node_cpp:
       rosbag_control: true
       rosbag_player_node: "/rosbag2_player"
       # 各阶段图层默认开关（数字键 1-6 切换）
-      detect_stage_1: false   # 1键: 传统=预处理 / YOLO=letterbox
-      detect_stage_2: false   # 2键: 传统=灯条 / YOLO=score过滤
-      detect_stage_3: false   # 3键: 传统=装甲匹配 / YOLO=NMS结果
-      detect_stage_4: false   # 4键: 传统=数字分类 / YOLO=后端最终输出
-      corner_correction: false # 6键: 角点修正对比（原始→修正）
-      pose: true              # 5键: /armor_markers 发布
-      result: true            # 0键: 最终装甲板 X 标记
-      # PoseRefine CSV 输出（默认关闭，实验 launch 强制开启）
+      detect_stage_1: false         # 1键: 传统=预处理 / YOLO=letterbox
+      detect_stage_2: false         # 2键: 传统=灯条 / YOLO=score过滤
+      detect_stage_3: false         # 3键: 传统=装甲匹配 / YOLO=NMS结果
+      detect_stage_4: false         # 4键: 传统=数字分类 / YOLO=后端最终输出
+      corner_correction: false      # 6键: 角点修正对比（原始→修正）
+      pose: true                    # 5键: /armor_markers 发布
+      result: true                  # 0键: 最终装甲板 X 标记
+
       pose_refine_csv:
         enabled: false
         root_dir: ""
         video: "manual"
-      # PoseRefine topic 输出（默认开启，跟 debug.pose 图层绑定）
       pose_refine_topic:
         enabled: true
-      # 耗时统计打印间隔（帧数）
       stats_interval: 50
 
     # ==================== 播放控制 ====================

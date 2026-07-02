@@ -21,6 +21,7 @@ namespace armor_detector {
         MIN_AREA_RECT,
         FIT_ELLIPSE,
         PCA_GRADIENT,
+        NONE,
     };
 
     struct LightBarCorrectionResult {

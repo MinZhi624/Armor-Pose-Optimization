@@ -183,7 +183,6 @@ namespace armor_detector {
         }
 
         // Corner correction parameters
-        declare_parameter("detector.corner_correction.enabled", true);
         declare_parameter("detector.corner_correction.method", "fit_ellipse");
         declare_parameter("detector.corner_correction.roi_scale", 1.25);
         declare_parameter("detector.corner_correction.gray_threshold", 100);
@@ -199,8 +198,8 @@ namespace armor_detector {
         declare_parameter("detector.corner_correction.light.min_contours_ratio", 0.06);
         declare_parameter("detector.corner_correction.light.max_contours_ratio", 0.5);
 
-        get_parameter("detector.corner_correction.enabled", detector_params.corner_correction.enabled);
         get_parameter("detector.corner_correction.method", detector_params.corner_correction.method);
+        debug_config_.pose_refine_csv_corner_method = detector_params.corner_correction.method;
         {
             double roi_scale;
             get_parameter("detector.corner_correction.roi_scale", roi_scale);
@@ -263,6 +262,7 @@ namespace armor_detector {
             debug_hub_.addObserver(
                 std::make_shared<debug::DebugPoseRefineCsvWriter>(debug_config_.pose_refine_csv_root_dir,
                                                                   debug_config_.pose_refine_csv_video,
+                                                                  debug_config_.pose_refine_csv_corner_method,
                                                                   pose_refiner_.methodName()));
         }
 

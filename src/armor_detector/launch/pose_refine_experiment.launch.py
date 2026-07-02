@@ -25,7 +25,6 @@ def generate_launch_description():
     config = os.path.join(package_share, 'config', 'config.yaml')
 
     video = LaunchConfiguration('video')
-    refine_method = LaunchConfiguration('refine_method')
     frame_count = LaunchConfiguration('frame_count')
     timing_interval = LaunchConfiguration('timing_interval')
     use_foxglove = LaunchConfiguration('use_foxglove')
@@ -62,7 +61,6 @@ def generate_launch_description():
                 'playback.mode': 'step',
                 'playback.max_frames': frame_count,
                 'playback.exit_on_complete': True,
-                'pose.refine_method': refine_method,
             },
         ],
         output='screen'
@@ -77,7 +75,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('video', default_value='video1'),
-        DeclareLaunchArgument('refine_method', default_value='pose_only_ba_4dof'),
         DeclareLaunchArgument('frame_count', default_value='0'),
         DeclareLaunchArgument('timing_interval', default_value='50'),
         DeclareLaunchArgument('use_foxglove', default_value='true'),

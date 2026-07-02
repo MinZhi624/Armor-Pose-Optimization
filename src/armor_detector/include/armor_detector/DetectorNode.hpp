@@ -1,14 +1,14 @@
 #pragma once
 
 #include "armor_detector/CameraProvider.hpp"
-#include "armor_detector/pose/PoseSolver.hpp"
 #include "armor_detector/debug/DebugData.hpp"
 #include "armor_detector/debug/DebugGUI.hpp"
 #include "armor_detector/debug/DebugHub.hpp"
 #include "armor_detector/debug/DebugLayerState.hpp"
 #include "armor_detector/debug/DebugPoseMarkerPublisher.hpp"
-#include "armor_detector/pose/PoseRefineRunner.hpp"
 #include "armor_detector/detector/Detector.hpp"
+#include "armor_detector/pose/PoseRefineRunner.hpp"
+#include "armor_detector/pose/PoseSolver.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <rosbag2_interfaces/srv/play_next.hpp>
@@ -41,6 +41,7 @@ namespace armor_detector {
         bool pose_refine_csv_enabled = false;
         std::string pose_refine_csv_root_dir;
         std::string pose_refine_csv_video = "manual";
+        std::string pose_refine_csv_corner_method;
 
         // Pose refine topic
         bool pose_refine_topic_enabled = true;

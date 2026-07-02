@@ -114,10 +114,10 @@ init_err:4.41px final_err:4.15px improv:0.26px
 每帧每装甲板写一行 CSV，路径格式：
 
 ```
-debug/pose_refine/log/<video>/<method>/<timestamp>.csv
+debug/pose_refine/log/<video>/<corner_method>/<refine_method>/<timestamp>.csv
 ```
 
-CSV 列：`frame_index, stamp_sec, stamp_nanosec, armor_index, armor_name, armor_type, confidence, center_x_px, center_y_px, method, success, initial/final/delta xyz (m), initial/final/delta yaw (rad), initial/final/delta error (px)`
+CSV 列：`frame_index, stamp_sec, stamp_nanosec, armor_index, armor_name, armor_type, confidence, center_x_px, center_y_px, corner_method, method, success, initial/final/delta xyz (m), initial/final/delta yaw (rad), initial/final/delta error (px)`（`corner_method` 为灯条修正方法，`method` 为位姿 refine 方法）
 
 ### DebugPoseRefineTopicPublisher
 
@@ -176,15 +176,15 @@ ros2 launch armor_detector auto_test.launch.py \
     video:=video1 frame_count:=150
 ```
 
-CSV 自动输出到 `debug/pose_refine/log/<video>/<method>/`。
+CSV 自动输出到 `debug/pose_refine/log/<video>/<corner_method>/<refine_method>/`。
 
 ### 2. 选择 target.csv
 
 将想要分析的 CSV 复制为：
 
 ```bash
-cp debug/pose_refine/log/video1/yaw_search/<timestamp>.csv \
-   debug/pose_refine/log/video1/yaw_search/target.csv
+cp debug/pose_refine/log/video1/pca_gradient/yaw_search/<timestamp>.csv \
+   debug/pose_refine/log/video1/pca_gradient/yaw_search/target.csv
 ```
 
 ### 3. 分析 XY 分布
@@ -194,7 +194,9 @@ cd debug/pose_refine
 python3 analyze_xy_distribution.py
 ```
 
-输出：`analy/picture/<video>/<method>/xy_distribution.png`
+输出：`analy/picture/<video>/<corner_method>/<refine_method>/xy_distribution.png`
+
+> 分析脚本兼容旧版 2 级路径 `debug/pose_refine/log/<video>/<method>/`（无 corner_method 层级）。
 
 ## 添加新方法
 

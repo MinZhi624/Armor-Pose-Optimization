@@ -13,7 +13,6 @@
 namespace armor_detector::pose {
 
     namespace {
-        constexpr double kAcceptEpsilonPx = 1e-6;
         constexpr double kHuberLossScalePx = 3.0;
 
         struct ReprojectionErrorNorm {
@@ -30,18 +29,11 @@ namespace armor_detector::pose {
                 const T cy = ceres::cos(yaw);
                 const T sy = ceres::sin(yaw);
 
-                const T pitch = T(tools::ARMOR_PITCH_RAD);
-                const T cp = ceres::cos(pitch);
-                const T sp = ceres::sin(pitch);
-
                 Eigen::Matrix<T, 3, 3> Rz;
                 Rz << cy, -sy, T(0), sy, cy, T(0), T(0), T(0), T(1);
 
-                Eigen::Matrix<T, 3, 3> Ry;
-                Ry << cp, T(0), sp, T(0), T(1), T(0), -sp, T(0), cp;
-
                 const Eigen::Matrix<T, 3, 1> xyz_gimbal(pose[0], pose[1], pose[2]);
-                const Eigen::Matrix<T, 3, 1> p_gimbal = Rz * Ry * p_armor + xyz_gimbal;
+                const Eigen::Matrix<T, 3, 1> p_gimbal = Rz * p_armor + xyz_gimbal;
 
                 // gimbal -> camera: x_camera=-y_gimbal, y_camera=-z_gimbal, z_camera=x_gimbal.
                 const Eigen::Matrix<T, 3, 1> p_camera(-p_gimbal.y(), -p_gimbal.z(), p_gimbal.x());
@@ -150,8 +142,7 @@ namespace armor_detector::pose {
                                                                    refined_tvec,
                                                                    input.camera_matrix,
                                                                    input.distortion_coefficients);
-        if (isUsableOutputPose(refined_rvec, refined_tvec) && std::isfinite(refined_error_px) &&
-            refined_error_px <= output.reprojection_error_px + kAcceptEpsilonPx) {
+        if (isUsableOutputPose(refined_rvec, refined_tvec) && std::isfinite(refined_error_px)) {
             output.rvec = refined_rvec;
             output.tvec = refined_tvec;
             output.reprojection_error_px = refined_error_px;

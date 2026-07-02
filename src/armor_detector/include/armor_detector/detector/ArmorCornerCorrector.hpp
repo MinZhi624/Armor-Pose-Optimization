@@ -26,7 +26,6 @@ namespace armor_detector {
     };
 
     struct CornerCorrectionParams {
-        bool enabled = true;
         std::string method = "fit_ellipse";
         float roi_scale = 1.25f;
         int gray_threshold = 100;
@@ -51,8 +50,10 @@ namespace armor_detector {
 
         LightBarCorrectionInput buildCorrectionInput(const LightBar &light, const cv::Mat &gray_img) const;
 
-        debug::CornerCorrectionRecord
-        correctOne(const DetectedArmor &armor, const cv::Mat &, const cv::Mat &gray_img) const;
+        debug::CornerCorrectionRecord correctOne(const DetectedArmor &armor,
+                                                 const cv::Mat &,
+                                                 const cv::Mat &gray_img,
+                                                 LightBarCorrectionMethod method) const;
     };
 
 } // namespace armor_detector

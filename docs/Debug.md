@@ -137,7 +137,9 @@ debug:
   detect_stage_2: false   # traditional: 灯条; yolo: score 阈值候选
   detect_stage_3: false   # traditional: 装甲板匹配; yolo: NMS/过滤结果
   detect_stage_4: false   # traditional: 数字分类; yolo: 最终检测
-  corner_correction: false # 角点修正对比（原始→修正）
+  corner_correction: false # 6键: 角点修正对比（原始→修正）——仅控制可视化图层，
+                           #       算法行为由 detector.corner_correction.method
+                           #       和 geometry.enabled 控制
   pose: true              # 控制 /armor_markers 发布
   result: true            # 最终结果显示
   stats_interval: 50      # 耗时统计打印间隔（帧数）

@@ -63,6 +63,7 @@ temp/
 docs/superpowers/
 debug/pose_refine/log/
 .mimocode/
+.omo/
 # 视屏 
 *.avi
 *.mp4

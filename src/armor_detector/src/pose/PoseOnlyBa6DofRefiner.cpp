@@ -133,8 +133,7 @@ namespace armor_detector::pose {
                                                                    refined_tvec,
                                                                    input.camera_matrix,
                                                                    input.distortion_coefficients);
-        if (isUsableOutputPose(refined_rvec, refined_tvec) && std::isfinite(refined_error_px) &&
-            refined_error_px <= output.reprojection_error_px + kAcceptEpsilonPx) {
+        if (isUsableOutputPose(refined_rvec, refined_tvec) && std::isfinite(refined_error_px)) {
             output.rvec = refined_rvec;
             output.tvec = refined_tvec;
             output.reprojection_error_px = refined_error_px;

@@ -193,11 +193,16 @@ namespace armor_detector {
     }
 
     LightBarCorrectionMethod ArmorCornerCorrector::parseMethod(const std::string &method_str) const {
+        if (method_str == "none")
+            return LightBarCorrectionMethod::NONE;
         if (method_str == "min_area_rect")
             return LightBarCorrectionMethod::MIN_AREA_RECT;
         if (method_str == "pca_gradient")
             return LightBarCorrectionMethod::PCA_GRADIENT;
-        return LightBarCorrectionMethod::FIT_ELLIPSE;
+        if (method_str == "fit_ellipse")
+            return LightBarCorrectionMethod::FIT_ELLIPSE;
+        throw std::invalid_argument("Unknown corner correction method: " + method_str +
+                                    ". Allowed: none, fit_ellipse, min_area_rect, pca_gradient");
     }
 
     cv::Rect ArmorCornerCorrector::computeLightROI(const LightBar &light, const cv::Size &img_size) const {
@@ -239,8 +244,10 @@ namespace armor_detector {
         return input;
     }
 
-    debug::CornerCorrectionRecord
-    ArmorCornerCorrector::correctOne(const DetectedArmor &armor, const cv::Mat &, const cv::Mat &gray_img) const {
+    debug::CornerCorrectionRecord ArmorCornerCorrector::correctOne(const DetectedArmor &armor,
+                                                                   const cv::Mat &,
+                                                                   const cv::Mat &gray_img,
+                                                                   LightBarCorrectionMethod method) const {
         debug::CornerCorrectionRecord record;
         record.original_corners = armor.geometry.corners;
         record.output_corners = armor.geometry.corners;
@@ -277,44 +284,50 @@ namespace armor_detector {
         LightBar candidate_right = right_seed;
         std::array<cv::Point2f, 4> candidate_corners = record.original_corners;
 
-        LightBarCorrector corrector;
-        LightBarCorrectionMethod method = parseMethod(params_.method);
-        auto left_input = buildCorrectionInput(left_seed, gray_img);
-        auto right_input = buildCorrectionInput(right_seed, gray_img);
-        auto lr = corrector.correct(left_input, method);
-        auto rr = corrector.correct(right_input, method);
-        record.left_gray_roi = lr.debug_gray_roi;
-        record.right_gray_roi = rr.debug_gray_roi;
-        record.left_pca_viz = lr.debug_pca_viz;
-        record.right_pca_viz = rr.debug_pca_viz;
-
-        if (lr.corrected && rr.corrected) {
-            LightBar lo = lr.output_light;
-            LightBar ro = rr.output_light;
-            std::array<cv::Point2f, 4> oc = {lo.top, ro.top, ro.bottom, lo.bottom};
-            float td = 0.0f;
-            for (int i = 0; i < 4; ++i)
-                td += cv::norm(oc[i] - record.original_corners[i]);
-            if (td <= params_.max_endpoint_distance_px) {
-                candidate_left = lo;
-                candidate_right = ro;
-                candidate_corners = oc;
-                record.output_corners = oc;
-                record.has_output_lights = true;
-                record.left_output_light = lo;
-                record.right_output_light = ro;
-                record.corrected = true;
-                record.detail = "success";
-            }
-            else {
-                record.detail = "raw_used:distance_reject";
-            }
-        }
-        else if (!lr.corrected) {
-            record.detail = "raw_used:light_correction_failed:left:" + lr.detail;
+        if (method == LightBarCorrectionMethod::NONE) {
+            record.output_corners = record.original_corners;
+            record.corrected = false;
+            record.detail = "none_method";
         }
         else {
-            record.detail = "raw_used:light_correction_failed:right:" + rr.detail;
+            LightBarCorrector corrector;
+            auto left_input = buildCorrectionInput(left_seed, gray_img);
+            auto right_input = buildCorrectionInput(right_seed, gray_img);
+            auto lr = corrector.correct(left_input, method);
+            auto rr = corrector.correct(right_input, method);
+            record.left_gray_roi = lr.debug_gray_roi;
+            record.right_gray_roi = rr.debug_gray_roi;
+            record.left_pca_viz = lr.debug_pca_viz;
+            record.right_pca_viz = rr.debug_pca_viz;
+
+            if (lr.corrected && rr.corrected) {
+                LightBar lo = lr.output_light;
+                LightBar ro = rr.output_light;
+                std::array<cv::Point2f, 4> oc = {lo.top, ro.top, ro.bottom, lo.bottom};
+                float td = 0.0f;
+                for (int i = 0; i < 4; ++i)
+                    td += cv::norm(oc[i] - record.original_corners[i]);
+                if (td <= params_.max_endpoint_distance_px) {
+                    candidate_left = lo;
+                    candidate_right = ro;
+                    candidate_corners = oc;
+                    record.output_corners = oc;
+                    record.has_output_lights = true;
+                    record.left_output_light = lo;
+                    record.right_output_light = ro;
+                    record.corrected = true;
+                    record.detail = "success";
+                }
+                else {
+                    record.detail = "raw_used:distance_reject";
+                }
+            }
+            else if (!lr.corrected) {
+                record.detail = "raw_used:light_correction_failed:left:" + lr.detail;
+            }
+            else {
+                record.detail = "raw_used:light_correction_failed:right:" + rr.detail;
+            }
         }
 
         GeometryMetrics metrics;
@@ -338,6 +351,7 @@ namespace armor_detector {
                                                                  const cv::Mat &bgr_img) const {
         ArmorCornerCorrectionResult result;
         result.armors = armors;
+        LightBarCorrectionMethod method = parseMethod(params_.method);
         if (bgr_img.empty()) {
             for (const auto &a : armors) {
                 debug::CornerCorrectionRecord r;
@@ -350,23 +364,11 @@ namespace armor_detector {
             }
             return result;
         }
-        if (!params_.enabled) {
-            for (std::size_t i = 0; i < armors.size(); ++i) {
-                debug::CornerCorrectionRecord r;
-                r.original_corners = armors[i].geometry.corners;
-                r.output_corners = armors[i].geometry.corners;
-                r.accepted = true;
-                r.method = params_.method;
-                r.detail = "disabled";
-                result.debug.records.push_back(r);
-            }
-            return result;
-        }
         cv::Mat gray_img;
         cv::cvtColor(bgr_img, gray_img, cv::COLOR_BGR2GRAY);
         result.armors.clear();
         for (std::size_t i = 0; i < armors.size(); ++i) {
-            auto record = correctOne(armors[i], bgr_img, gray_img);
+            auto record = correctOne(armors[i], bgr_img, gray_img, method);
             if (record.accepted) {
                 DetectedArmor output = armors[i];
                 const LightBar *metrics_left = nullptr;
