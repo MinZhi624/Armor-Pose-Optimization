@@ -74,7 +74,7 @@ armor_detector_node_cpp:
       # "pose_only_ba_4dof_ypd",
       # "yaw_search",
       # "none"
-      refine_method: "pose_only_ba_4dof_ypd"
+      refine_method: "yaw_search"
     # ==================== Debug ====================
     debug:
       # OpenCV GUI 开关（false=无头模式，不显示窗口）``

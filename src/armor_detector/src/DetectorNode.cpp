@@ -1,12 +1,12 @@
 #include "armor_detector/DetectorNode.hpp"
 #include "armor_detector/debug/DebugArmorMatch.hpp"
+#include "armor_detector/debug/DebugArmorYawPublisher.hpp"
 #include "armor_detector/debug/DebugClassification.hpp"
 #include "armor_detector/debug/DebugCornerCorrection.hpp"
 #include "armor_detector/debug/DebugLayerController.hpp"
 #include "armor_detector/debug/DebugLight.hpp"
 #include "armor_detector/debug/DebugPoseRefineCsvWriter.hpp"
 #include "armor_detector/debug/DebugPoseRefineStats.hpp"
-#include "armor_detector/debug/DebugPoseRefineTopicPublisher.hpp"
 #include "armor_detector/debug/DebugPreprocess.hpp"
 #include "armor_detector/debug/DebugResult.hpp"
 #include "armor_detector/debug/DebugTiming.hpp"
@@ -267,7 +267,7 @@ namespace armor_detector {
         }
 
         if (debug_config_.pose_refine_topic_enabled) {
-            debug_hub_.addObserver(std::make_shared<debug::DebugPoseRefineTopicPublisher>(*this, layer_state_));
+            debug_hub_.addObserver(std::make_shared<debug::DebugArmorYawPublisher>(*this, layer_state_));
         }
 
         // GUI observer：仅 debug.show=true 时注册

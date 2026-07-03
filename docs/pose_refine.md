@@ -29,7 +29,7 @@ DetectorNode::run()
   → DebugHub::onPoseSolved()
       → DebugPoseRefineStats    (终端统计)
       → DebugPoseRefineCsvWriter (CSV 文件)
-      → DebugPoseRefineTopicPublisher (ROS2 topic)
+      → DebugArmorYawPublisher (ROS2 topic)
 ```
 
 ## 数据类型
@@ -119,17 +119,22 @@ debug/pose_refine/log/<video>/<corner_method>/<refine_method>/<timestamp>.csv
 
 CSV 列：`frame_index, stamp_sec, stamp_nanosec, armor_index, armor_name, armor_type, confidence, center_x_px, center_y_px, corner_method, method, success, initial/final/delta xyz (m), initial/final/delta yaw (rad), initial/final/delta error (px)`（`corner_method` 为灯条修正方法，`method` 为位姿 refine 方法）
 
-### DebugPoseRefineTopicPublisher
+### DebugArmorYawPublisher
 
-发布 `/debug/pose_refine` topic（`armor_interfaces::msg::PoseRefineDebug`），受 `debug.pose` 图层控制。只发布第一个成功的 record。
+发布 `/debug/armor_yaw` topic（`armor_interfaces::msg::ArmorYawDebug`），受 `debug.pose` 图层控制。发布最多两个稳定槽位：优先按上一帧 yaw 连续性和图像中心匹配已有槽位，空槽或失效槽位用 `NaN` 填充。
 
 消息定义：
 
 ```
 std_msgs/Header header
-float64 origin_yaw_rad
-float64 final_yaw_rad
-float64 error_delta_px
+# armor_1
+float64 armor_1_origin_yaw_rad
+float64 armor_1_final_yaw_rad
+float64 armor_1_error_delta_px
+# armor_2
+float64 armor_2_origin_yaw_rad
+float64 armor_2_final_yaw_rad
+float64 armor_2_error_delta_px
 ```
 
 ## 配置
@@ -148,7 +153,7 @@ debug:
     root_dir: ""                  # workspace root（launch 自动填入）
     video: "manual"               # 视频名（launch 自动填入）
   pose_refine_topic:
-    enabled: true                 # /debug/pose_refine topic
+    enabled: true                 # /debug/armor_yaw topic
   stats_interval: 50              # Stats 打印间隔（帧数）
 ```
 

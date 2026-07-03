@@ -1,0 +1,9 @@
+std_msgs/Header header
+# armor_1
+float64 armor_1_origin_yaw_rad
+float64 armor_1_final_yaw_rad
+float64 armor_1_error_delta_px
+# armor_2
+float64 armor_2_origin_yaw_rad
+float64 armor_2_final_yaw_rad
+float64 armor_2_error_delta_px

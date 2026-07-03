@@ -55,7 +55,7 @@ add_executable(armor_detector_node
   src/debug/DebugCornerCorrectionView.cpp
   src/debug/DebugPoseRefineStats.cpp
   src/debug/DebugPoseRefineCsvWriter.cpp
-  src/debug/DebugPoseRefineTopicPublisher.cpp
+  src/debug/DebugArmorYawPublisher.cpp
   src/detector/YoloBackend.cpp
 )
 
