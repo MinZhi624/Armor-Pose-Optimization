@@ -27,17 +27,18 @@ namespace armor_detector::debug {
     /**
      * @brief 可切换的 debug 图层标识。
      *
-     * 用于 DebugLayerState 和数字键 (1-6) 切换。
+     * 用于 DebugLayerState 和数字键 (1-7) 切换。
      * timing 不是图层——它在 debug.show=true 时始终启用。
      */
     enum class DebugLayer {
         UNKNOWN,
-        DETECT_STAGE_1,  // traditional: preprocess; yolo: letterbox input
-        DETECT_STAGE_2,  // traditional: lights; yolo: raw candidates after score threshold
-        DETECT_STAGE_3,  // traditional: armor match; yolo: NMS/filter result
-        DETECT_STAGE_4,  // traditional: classification; yolo: final detections
+        DETECT_STAGE_1, // traditional: preprocess; yolo: letterbox input
+        DETECT_STAGE_2, // traditional: lights; yolo: raw candidates after score threshold
+        DETECT_STAGE_3, // traditional: armor match; yolo: NMS/filter result
+        DETECT_STAGE_4, // traditional: classification; yolo: final detections
         CORNER_CORRECTION,
         POSE,
+        POSE_REFINE,
         RESULT,
     };
 
@@ -146,6 +147,9 @@ namespace armor_detector::debug {
         double initial_reprojection_error_px = 0.0;
         double final_reprojection_error_px = 0.0;
         double delta_reprojection_error_px = 0.0;
+
+        bool has_projected_corners = false;
+        std::array<cv::Point2f, 4> projected_corners{};
     };
 
     struct PoseDebugData {

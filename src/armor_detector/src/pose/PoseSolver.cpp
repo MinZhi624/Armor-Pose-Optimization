@@ -128,6 +128,15 @@ namespace armor_detector {
             rec.initial_reprojection_error_px = initial_error;
             rec.final_reprojection_error_px = refine_output.reprojection_error_px;
             rec.delta_reprojection_error_px = initial_error - refine_output.reprojection_error_px;
+            if (refine_output.success) {
+                const auto projected_corners = pose::projectArmor(classified.geometry.type,
+                                                                  refine_output.rvec,
+                                                                  refine_output.tvec,
+                                                                  camera_matrix_,
+                                                                  distortion_coefficients_);
+                std::copy_n(projected_corners.begin(), rec.projected_corners.size(), rec.projected_corners.begin());
+                rec.has_projected_corners = true;
+            }
             pose_debug_.refine_records.push_back(rec);
 
             auto refine_end = std::chrono::steady_clock::now();

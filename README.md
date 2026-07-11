@@ -38,7 +38,7 @@ ros2 launch armor_detector run.launch.py video:=video1
 
 Foxglove 连接 `ws://localhost:8765`，查看 `/armor_markers` topic。
 
-按键操作：`[1-6]` 切换图层，`[5]` 切换 pose marker，`[Space]` 暂停，`[n]` 单步。
+按键操作：`[1-7]` 切换图层，`[5]` 切换 pose marker，`[7]` 切换 Pose Refine 重投影角点，`[Space]` 暂停，`[n]` 单步。
 
 ### 自动测试（无头 step 模式）
 

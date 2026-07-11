@@ -5,6 +5,7 @@
 #include "armor_detector/debug/DebugCornerCorrection.hpp"
 #include "armor_detector/debug/DebugLayerController.hpp"
 #include "armor_detector/debug/DebugLight.hpp"
+#include "armor_detector/debug/DebugPoseRefine.hpp"
 #include "armor_detector/debug/DebugPoseRefineCsvWriter.hpp"
 #include "armor_detector/debug/DebugPoseRefineStats.hpp"
 #include "armor_detector/debug/DebugPreprocess.hpp"
@@ -63,6 +64,7 @@ namespace armor_detector {
         debug_config_.detect_stage_4 = this->declare_parameter<bool>("debug.detect_stage_4", false);
         debug_config_.corner_correction = this->declare_parameter<bool>("debug.corner_correction", false);
         debug_config_.pose = this->declare_parameter<bool>("debug.pose", false);
+        debug_config_.pose_refine = this->declare_parameter<bool>("debug.pose_refine", false);
         debug_config_.result = this->declare_parameter<bool>("debug.result", true);
         debug_config_.stats_interval =
             static_cast<std::size_t>(this->declare_parameter<int>("debug.stats_interval", 50));
@@ -250,6 +252,7 @@ namespace armor_detector {
         layer_state_.setEnabled(debug::DebugLayer::DETECT_STAGE_3, debug_config_.detect_stage_3);
         layer_state_.setEnabled(debug::DebugLayer::DETECT_STAGE_4, debug_config_.detect_stage_4);
         layer_state_.setEnabled(debug::DebugLayer::POSE, debug_config_.pose);
+        layer_state_.setEnabled(debug::DebugLayer::POSE_REFINE, debug_config_.pose_refine);
         layer_state_.setEnabled(debug::DebugLayer::RESULT, debug_config_.result);
         layer_state_.setEnabled(debug::DebugLayer::CORNER_CORRECTION, debug_config_.corner_correction);
 
@@ -286,13 +289,14 @@ namespace armor_detector {
         debug_hub_.addObserver(std::make_shared<debug::DebugClassificationView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugYoloView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugCornerCorrectionView>(debug_gui_, layer_state_));
+        debug_hub_.addObserver(std::make_shared<debug::DebugPoseRefineView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugLayerController>(layer_state_));
 
         debug_key_timer_ = this->create_wall_timer(std::chrono::milliseconds(15), [this]() { pollDebugKeys(); });
 
         RCLCPP_INFO(this->get_logger(),
                     "按键操作: [q/ESC]退出  [Space/p]暂停/继续  [n/→]单步  "
-                    "[s]保存ROI  [+/-]加速/减速  [1-6]切换图层  [0]结果");
+                    "[s]保存ROI  [+/-]加速/减速  [1-7]切换图层  [0]结果");
     }
 
     void DetectorNode::initRosbagClients() {

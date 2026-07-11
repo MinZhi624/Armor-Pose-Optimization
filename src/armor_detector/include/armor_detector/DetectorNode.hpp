@@ -34,6 +34,7 @@ namespace armor_detector {
         bool detect_stage_4 = false;
         bool corner_correction = false;
         bool pose = false;
+        bool pose_refine = false;
         bool result = true;
         std::size_t stats_interval = 50;
 

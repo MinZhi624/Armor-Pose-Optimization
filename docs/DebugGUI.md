@@ -1,193 +1,84 @@
-# DebugGUI 注册规范
+# DebugGUI 显示注册规范
 
-本文档记录 `armor_detector` debug GUI 的显示注册规则。默认只使用 `debug_show` 一个窗口；各模块通过图层叠加显示。单位、坐标系、`cv::Mat` 生命周期见 `Conventions.md`。
+本文档按 `Core-Ball-Vision` 当前 `debug::DebugGUI` 实现记录 GUI 使用规则。`DebugGUI` 是 OpenCV HighGUI 的唯一出口，并通过独立线程隔离窗口显示与主线程帧处理。
 
 ## 总体原则
 
-- OpenCV 颜色统一使用 BGR 顺序。
-- 所有 debug 显示内容都要登记，避免窗口中元素互相覆盖或颜色语义冲突。
-- 文字叠加和图形绘制分开登记。
-- 文字样式统一，不在各个 Observer 中随意修改字体、字号、行高。
-- 图形颜色、线宽、点半径等参数应集中注册，不在代码中散落魔法值。
-- GUI 只表达 debug 语义，不参与算法判断。
-- 如果显示内容、位置、行号、颜色或绘制样式发生变化，必须同步更新本文档。
+- 只有 `DebugGUI::loop()` 可以调用 `cv::imshow`、`cv::waitKeyEx`、`cv::destroyWindow` 和 `cv::destroyAllWindows`。
+- 主线程或 Observer 通过 `setFrame()` 提交图像，通过 `takeKeyEvents()` 获取已翻译的按键事件。
+- OpenCV 图像颜色使用 BGR 顺序。
+- GUI 只显示和收集输入，不参与截图、算法判断或主循环状态修改。
+- 新增窗口、文字或图形显示时，必须在本文档登记名称、内容和显示条件。
 
-## 窗口策略
+## 生命周期与接口
 
-当前默认窗口：
+```cpp
+debug::DebugGUI debug_gui;
+debug_gui.start();
 
-```text
-debug_show
+debug_gui.setFrame("RESULT", image_bgr, 0.5);
+for (const auto &event : debug_gui.takeKeyEvents()) {
+    // main 处理事件
+}
+
+debug_gui.stop();
 ```
 
-默认不为每个模块单独开窗口。后续确实需要独立窗口时，必须先在本文档新增对应窗口注册表。
+| 接口 | 行为 |
+|---|---|
+| `start()` | GUI 启用且尚未运行时创建 GUI 线程 |
+| `stop()` | 停止并 join GUI 线程，清空待显示帧、按键和待销毁窗口 |
+| `setFrame(name, image, scale)` | clone 图像，可选缩放后替换同名窗口的最新帧 |
+| `clearFrame(name)` | 移除同名帧，并让 GUI 线程销毁已显示窗口 |
+| `takeKeyEvents()` | 原子地取走并清空按键队列 |
+| `setEnabled(false)` | 禁止后续 GUI 启动和帧提交；不替代已运行实例的 `stop()` |
 
-## 文字叠加规范
+`setFrame()` 拒绝空图像或空窗口名。它会 clone 输入图像，因此调用者可以在提交后继续修改或释放原始 `cv::Mat`。
 
-### 统一文本样式
+## 线程与队列行为
 
-当前所有 debug 文字统一使用下面样式：
+GUI 线程每轮执行以下步骤：
 
-```text
-font_face:      cv::FONT_HERSHEY_SIMPLEX
-font_scale:     0.60
-font_thickness: 2
-line_type:      cv::LINE_AA
-line_height_px: 24
-margin_x_px:    10
-margin_y_px:    24
-```
+1. 销毁 `clearFrame()` 登记的窗口。
+2. 在锁保护下复制当前窗口帧表的快照。
+3. 对快照中的每个窗口调用 `cv::imshow`。
+4. 通过 `cv::waitKeyEx(1)` 读取一个按键，翻译后放入按键队列。
 
-说明：
+帧表按窗口名保存一张最新图像，不积压历史帧。按键队列最多保存 16 个事件；满时丢弃最早事件。主线程应每轮调用 `takeKeyEvents()`，尤其暂停时也不能停止读取，否则 `Q` 无法及时退出。
 
-- `line_height_px` 是同一位置内相邻两行文字的垂直间距。
-- `margin_x_px` / `margin_y_px` 是文字锚点距离窗口边缘的基础边距。
-- 后续如果某个窗口确实需要不同字号，必须在该窗口小节中单独说明原因。
+## 当前窗口注册表
 
-### 文本位置槽位
+当前主循环只提交一个窗口：
 
-每个窗口固定提供四个文本位置：
+| 窗口名 | 图像来源 | 缩放 | 显示条件 | 说明 |
+|---|---|---:|---|---|
+| `RESULT` | `DebugFrameContext::display_bgr` | `0.5` | RESULT 图层开启且当前帧已处理 | 最终调试画面，包含 `DebugTiming` 的耗时文字 |
 
-```text
-TOP_LEFT      左上
-BOTTOM_LEFT   左下
-TOP_RIGHT     右上
-BOTTOM_RIGHT  右下
-```
+按 `0` 会切换 RESULT 图层。关闭时主线程调用 `clearFrame("RESULT")`，GUI 线程随后销毁该窗口；重新开启后，下一帧提交时会再次显示。
 
-行号从 1 开始。同一位置内：
+## 文字与图形登记
 
-```text
-line 1
-line 2
-line 3
-...
-```
+当前实现只注册 `DebugTiming` 的文字叠加：
 
-建议用途：
-
-```text
-TOP_LEFT      帧号、处理用时、主状态
-TOP_RIGHT     当前参数、模式、开关状态
-BOTTOM_LEFT   检测数量、拒绝原因摘要
-BOTTOM_RIGHT  坐标、分类、PnP 等结果摘要
-```
-
-### 文本注册格式
-
-每个窗口按下面格式登记文字：
-
-```text
-## 窗口名 - Text
-
-| 位置 | 行号 | 内容 | 字体颜色(BGR) | 说明 |
-|---|---:|---|---|---|
-| TOP_LEFT | 1 | frame processing time | (0, 165, 255) | 当前帧或阶段处理用时 |
-```
-
-字段说明：
-
-- `位置`：只能使用 `TOP_LEFT`、`BOTTOM_LEFT`、`TOP_RIGHT`、`BOTTOM_RIGHT`。
-- `行号`：同一位置内从 1 开始递增。
-- `内容`：写语义，不写具体变量值，例如 `frame processing time`，不要写 `Process: 12.3 ms`。
-- `字体颜色(BGR)`：OpenCV BGR 三元组。
-- `说明`：解释该行显示什么、什么时候显示。
-
-## 图形绘制规范
-
-图形绘制部分参考旧项目的 GUI debug 颜色注册方式，但改成表格登记。当前先定义格式，具体颜色和元素后续按图层补充。
-
-### 图形注册格式
-
-`debug_show` 中每个模块按图层登记：
-
-```text
-## debug_show - Draw
-
-| 图层 | 元素 | 内容 | 颜色(BGR) | 样式 | 显示条件 | 说明 |
-|---|---|---|---|---|---|---|
-| lights | rotated_rect | accepted light bar | (0, 255, 0) | thickness=2 | debug_lights enabled | 已通过筛选的灯条 |
-```
-
-字段说明：
-
-- `图层`：同一窗口内的逻辑层，例如 `preprocess`、`lights`、`armor_match`、`classification`、`pose`。
-- `元素`：绘制元素类型，例如 `point`、`line`、`rect`、`rotated_rect`、`polygon`、`text_background`。
-- `内容`：元素语义，例如 `accepted light bar`、`rejected armor candidate`。
-- `颜色(BGR)`：OpenCV BGR 三元组。
-- `样式`：线宽、半径、填充方式等，例如 `thickness=2`、`radius=5 filled`。
-- `显示条件`：什么时候显示，例如 `always`、`debug_lights enabled`、`pnp failed`。
-- `说明`：补充解释。
-
-### 图形使用规则
-
-- `cv::Mat` 所有权和 clone 规则遵守 `Conventions.md`。
-- 同一窗口内相同语义保持同色，不同语义尽量不用同色。
-- 绘制点、线、框、文字时，必须能在原始图像和灰度/二值背景上看清。
-- 如果颜色不足以区分语义，应增加文字标签、线型或填充差异，不要只靠相近颜色区分。
-- 对同一目标的不同阶段结果，颜色应稳定，不要每帧随机变色。
-- 如果 `debug_show` 图形元素过多，应通过配置/按键关闭部分图层；确实需要时再新增独立窗口。
-
-## 当前注册表
-
-## debug_show - Text
-
-| 位置 | 行号 | 内容 | 字体颜色(BGR) | 说明 |
-|---|---:|---|---|---|
-| TOP_LEFT | 1 | frame processing time (total) | (0, 165, 255) | 当前帧总处理耗时，由 DebugTiming 绘制 |
-
-## debug_show - Draw
-
-| 图层 | 元素 | 内容 | 颜色(BGR) | 样式 | 显示条件 | 说明 |
-|---|---|---|---|---|---|---|
-| lights | rotated_rect | accepted light bar | (0, 255, 0) | thickness=2, LINE_AA | layer DETECT_STAGE_2 ON + traditional | 已通过筛选的灯条 |
-| lights | point | light endpoints (top/bottom) | (255, 0, 255) | radius=1, filled | layer DETECT_STAGE_2 ON + traditional | 灯条端点标记 |
-| lights | rotated_rect | rejected light bar | (0, 0, 255) | thickness=2, LINE_AA | layer DETECT_STAGE_2 ON + traditional | 被拒绝的灯条 |
-| lights | text | reject reason detail | (0, 0, 255) | scale=0.60, thickness=2 | layer DETECT_STAGE_2 ON + traditional | 拒绝原因文字，偏移 +5px |
-| yolo | polygon | score-filtered candidates | (0, 255, 255) | thickness=2, LINE_AA | layer DETECT_STAGE_2 ON + yolo | score 阈值后的候选框 |
-| yolo | polygon | NMS kept candidates | (0, 255, 0) | thickness=2, LINE_AA | layer DETECT_STAGE_3 ON + yolo | NMS 保留的候选 |
-| yolo | polygon | NMS rejected | (128, 128, 128) | thickness=1, LINE_AA | layer DETECT_STAGE_3 ON + yolo | NMS 抑制的候选 |
-| yolo | polygon | class/color filtered | (0, 0, 255) / (255, 0, 0) | thickness=1, LINE_AA | layer DETECT_STAGE_3 ON + yolo | 红=不支持类别，蓝=颜色不匹配 |
-| yolo | polygon | low confidence filtered | (0, 165, 255) | thickness=1, LINE_AA | layer DETECT_STAGE_3 ON + yolo | 橙色=低置信度 |
-| yolo | polygon + text | final detections | (255, 0, 255) | thickness=2, LINE_AA | layer DETECT_STAGE_4 ON + yolo | 最终检测框 + 名称/置信度 |
-| corner_correction | point | original corners | (0, 255, 0) | radius=1, filled | layer CORNER_CORRECTION ON | 原始四角点 |
-| corner_correction | point | corrected output corners | (255, 0, 255) | radius=1, filled | layer CORNER_CORRECTION ON + accepted + corrected | 已接受的修正后四角点 |
-| corner_correction | line | original→output connection | (192, 192, 192) | thickness=1, LINE_AA | layer CORNER_CORRECTION ON + accepted + corrected | 原始到修正的连线 |
-| corner_correction | polygon | raw-used armor | (128, 128, 128) | thickness=1, LINE_AA | layer CORNER_CORRECTION ON + accepted + !corrected | 修正失败但原始几何合理，最终保留 |
-| corner_correction | polygon | geometry rejected armor | (0, 80, 255) | thickness=1, LINE_AA | layer CORNER_CORRECTION ON + !accepted | 几何合理性失败，最终过滤 |
-| corner_correction | point | rejected corners | (0, 0, 255) | radius=1, filled | layer CORNER_CORRECTION ON + !accepted | 被过滤候选角点 |
-| corner_correction | point | raw light endpoints | (255, 255, 0) | radius=1, filled | layer CORNER_CORRECTION ON + has_raw_lights | 原始灯条端点（青色） |
-| corner_correction | point | output light endpoints | (255, 0, 128) | radius=1, filled | layer CORNER_CORRECTION ON + has_output_lights | 修正灯条端点（紫色） |
-| corner_correction | text | correction/filter detail | (128,128,128)/(0,80,255) | scale=0.35, thickness=1 | layer CORNER_CORRECTION ON + !corrected or !accepted | 回退原因或几何过滤原因 |
-| result | line | final classified armor X mark | (255, 0, 255) | thickness=1, LINE_AA | layer result ON | 最终识别装甲板 X 标记，紫色 |
-
-## yolo_stage1_letterbox - Draw
-
-YOLO 后端 Stage 1 独立窗口，显示 letterbox 输入图：
-
-| 元素 | 内容 | 颜色(BGR) | 样式 | 显示条件 | 说明 |
+| 窗口 | 位置 | 内容 | 颜色(BGR) | 样式 | 条件 |
 |---|---|---|---|---|---|
-| image | source_roi | — | resize to letterbox size | layer DETECT_STAGE_1 ON + yolo + use_roi | 源图 ROI 裁剪 |
-| image | letterbox | — | 640×640 | layer DETECT_STAGE_1 ON + yolo | letterbox 预处理结果 |
-| text | "source_roi" | (0, 165, 255) | scale=0.60, thickness=2 | 同上 | 左侧标注 |
-| text | "letterbox" | (0, 165, 255) | scale=0.60, thickness=2 | 同上 | 右侧标注 |
+| `RESULT` | 左上锚点 `(10, 24)` | 当前帧 `Process: <ms> ms` | `(0, 165, 255)` | `FONT_HERSHEY_SIMPLEX`，scale `0.6`，thickness `2`，`LINE_AA` | `display_bgr` 非空 |
 
-## /armor_markers (Foxglove/RViz)
+新增显示元素时：
 
-Pose debug 通过 `/armor_markers` topic 发布 `visualization_msgs/msg/MarkerArray`，由 `DebugPoseMarkerPublisher` observer 负责，受 `debug.pose` 图层控制（按键 5 切换）。
+- 在表中登记窗口名、元素语义、BGR 颜色、样式和显示条件。
+- 不要在 Observer 中直接使用 `imshow` 或 `waitKey`。
+- 同一语义应保持稳定颜色；需要多个图层时优先在 `DebugLayer` 中声明，并在主循环中实现切换行为。
+- 若新窗口需要跨线程长期持有图像，继续通过 `setFrame()` 提交，不能保存调用方 `cv::Mat` 的浅拷贝引用。
 
-| 属性 | 值 | 说明 |
-|---|---|---|
-| topic | /armor_markers | MarkerArray |
-| frame_id | gimbal | gimbal 坐标系 |
-| ns | armor_pose | 命名空间 |
-| type | CUBE | 3D 立方体 |
-| 位置 | xyz_gimbal | 装甲板在 gimbal 坐标系下的位置 |
-| 姿态 | yaw(PnP) + pitch(15°固定) + roll(0) | 从 ypr_gimbal 构造四元数 |
-| scale.x | 0.01 | 厚度 (m) |
-| scale.y | 0.135 / 0.225 | small / large 装甲板宽度 (m) |
-| scale.z | 0.055 | 装甲板高度 (m) |
-| 颜色 | (r=1.0, g=1.0, b=0.0, a=0.7) | 黄色半透明 |
-| lifetime | 0 | 永不过期，由 DELETEALL 清理 |
+## 按键归属
 
-生命周期：每帧先发 DELETEALL 清空上一帧，再发当前帧所有 cube。debug.pose 关闭时发 DELETEALL 清残留。
+`DebugGUI` 只负责将 `waitKeyEx` 的原始值交给 `DebugKeyHandler`。当前翻译规则如下：
+
+| 按键 | `DebugKeyAction` |
+|---|---|
+| `Esc`、`q`、`Q` | `EXIT` |
+| Space、`p`、`P` | `PAUSE_TOGGLE` |
+| `0` | `TOGGLE_LAYER`，图层为 `RESULT` |
+
+动作解释、暂停语义和退出顺序由主循环及 `Debug.md` 定义，不应放入 GUI 线程。

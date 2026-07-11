@@ -91,7 +91,10 @@ debug:
   detect_stage_4: false  # traditional: 数字分类; yolo: 最终检测
   corner_correction: false  # 角点修正对比
   pose: true
+  pose_refine: false     # 7键: Pose Refine 重投影角点
   result: true
+  pose_refine_csv: { enabled: false, root_dir: "", video: "manual" }
+  pose_refine_topic: { enabled: true }
   stats_interval: 50
 ```
 
@@ -116,10 +119,11 @@ debug:
 - **DebugGUI** — OpenCV 窗口统一管理
 - **DebugTiming** — 滑动窗口耗时统计（无头模式也打印日志）
 - **DebugPoseMarkerPublisher** — `/armor_markers` MarkerArray 发布（受 debug.pose 图层控制）
+- **DebugPoseRefineView** — Pose Refine 输出位姿的重投影角点叠加显示（受 debug.pose_refine / 7键控制）
 - **DebugLayerController** — 数字键切换图层
 - Traditional 专用: DebugPreprocessView, DebugLightView, DebugArmorMatchView, DebugClassificationView
 - YOLO 专用: DebugYoloView（letterbox/候选框/NMS/最终结果）
-- 通用: DebugResultView
+- 通用: DebugResultView, DebugPoseRefineView
 
 ### 播放模式
 
