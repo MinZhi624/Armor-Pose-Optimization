@@ -13,6 +13,7 @@
 #include "armor_detector/debug/DebugTiming.hpp"
 #include "armor_detector/debug/DebugYolo.hpp"
 #include "armor_detector/pose/PoseRefineData.hpp"
+#include "armor_detector/tools/angle.hpp"
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
@@ -65,6 +66,16 @@ namespace armor_detector {
         debug_config_.corner_correction = this->declare_parameter<bool>("debug.corner_correction", false);
         debug_config_.pose = this->declare_parameter<bool>("debug.pose", false);
         debug_config_.pose_refine = this->declare_parameter<bool>("debug.pose_refine", false);
+        debug_config_.pose_perturb_enabled = this->declare_parameter<bool>("debug.pose_perturb.enabled", true);
+        debug_config_.pose_perturb_show = this->declare_parameter<bool>("debug.pose_perturb.show", false);
+        debug_config_.pose_perturb_dir_yaw_delta_deg =
+            this->declare_parameter<double>("debug.pose_perturb.dir_yaw_delta_deg", 1.0);
+        debug_config_.pose_perturb_dir_pitch_delta_deg =
+            this->declare_parameter<double>("debug.pose_perturb.dir_pitch_delta_deg", 1.0);
+        debug_config_.pose_perturb_distance_delta_m =
+            this->declare_parameter<double>("debug.pose_perturb.distance_delta_m", 0.1);
+        debug_config_.pose_perturb_pose_yaw_delta_deg =
+            this->declare_parameter<double>("debug.pose_perturb.pose_yaw_delta_deg", 5.0);
         debug_config_.result = this->declare_parameter<bool>("debug.result", true);
         debug_config_.stats_interval =
             static_cast<std::size_t>(this->declare_parameter<int>("debug.stats_interval", 50));
@@ -96,6 +107,14 @@ namespace armor_detector {
         const auto refine_method = pose::poseRefineMethodFromString(refine_method_name);
         pose_refiner_.setMethod(refine_method);
         RCLCPP_INFO(this->get_logger(), "位姿估计方法: %s", pose::toString(refine_method).c_str());
+
+        PoseSolver::PosePerturbationParams perturbation_params;
+        perturbation_params.enabled = debug_config_.pose_perturb_enabled;
+        perturbation_params.dir_yaw_delta_rad = tools::degToRad(debug_config_.pose_perturb_dir_yaw_delta_deg);
+        perturbation_params.dir_pitch_delta_rad = tools::degToRad(debug_config_.pose_perturb_dir_pitch_delta_deg);
+        perturbation_params.distance_delta_m = debug_config_.pose_perturb_distance_delta_m;
+        perturbation_params.pose_yaw_delta_rad = tools::degToRad(debug_config_.pose_perturb_pose_yaw_delta_deg);
+        pose_solver_.setPosePerturbationParams(perturbation_params);
 
         auto package_share = ament_index_cpp::get_package_share_directory("armor_detector");
 
@@ -289,7 +308,8 @@ namespace armor_detector {
         debug_hub_.addObserver(std::make_shared<debug::DebugClassificationView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugYoloView>(debug_gui_, layer_state_));
         debug_hub_.addObserver(std::make_shared<debug::DebugCornerCorrectionView>(debug_gui_, layer_state_));
-        debug_hub_.addObserver(std::make_shared<debug::DebugPoseRefineView>(debug_gui_, layer_state_));
+        debug_hub_.addObserver(
+            std::make_shared<debug::DebugPoseRefineView>(debug_gui_, layer_state_, debug_config_.pose_perturb_show));
         debug_hub_.addObserver(std::make_shared<debug::DebugLayerController>(layer_state_));
 
         debug_key_timer_ = this->create_wall_timer(std::chrono::milliseconds(15), [this]() { pollDebugKeys(); });

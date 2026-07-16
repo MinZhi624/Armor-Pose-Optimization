@@ -50,3 +50,7 @@ Current validation is primarily rosbag playback plus ament lint. Use `auto_test.
 Recent commits use short Chinese subject lines such as `文档约定` and `框架搭建1`, without prefixes. Keep commit subjects concise, imperative or noun-phrase based, and focused on one change.
 
 Pull requests should include a brief description, affected modules, build/test results, and screenshots or terminal notes for GUI/debug behavior changes. Link related issues when available and update `docs/` when data conventions or pipeline behavior change.
+
+## Documentation Updates
+
+Do not update project documentation by default. Delegate documentation synchronization to the `文档同步agent`; only edit documentation directly when the user explicitly requests it.

@@ -6,6 +6,7 @@
 #include "armor_detector/tools/transform.hpp"
 
 #include <opencv2/calib3d.hpp>
+#include <opencv2/core/eigen.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -32,6 +33,14 @@ namespace armor_detector {
             }
             return distortion_mat;
         }
+
+        bool copyProjectedCorners(const std::vector<cv::Point2f> &projected, std::array<cv::Point2f, 4> &corners) {
+            if (projected.size() != corners.size()) {
+                return false;
+            }
+            std::copy(projected.begin(), projected.end(), corners.begin());
+            return true;
+        }
     } // namespace
 
     // ===================== 构造 / 初始化 =====================
@@ -43,6 +52,10 @@ namespace armor_detector {
     void PoseSolver::init(const CameraInfo &camera_info) {
         camera_matrix_ = camera_info.camera_matrix;
         distortion_coefficients_ = camera_info.distortion_coefficients;
+    }
+
+    void PoseSolver::setPosePerturbationParams(const PosePerturbationParams &params) {
+        pose_perturbation_params_ = params;
     }
 
     // ===================== 主流程 =====================
@@ -134,8 +147,54 @@ namespace armor_detector {
                                                                   refine_output.tvec,
                                                                   camera_matrix_,
                                                                   distortion_coefficients_);
-                std::copy_n(projected_corners.begin(), rec.projected_corners.size(), rec.projected_corners.begin());
-                rec.has_projected_corners = true;
+                rec.has_projected_corners = copyProjectedCorners(projected_corners, rec.projected_corners);
+
+                if (rec.has_projected_corners && pose_perturbation_params_.enabled) {
+                    const auto projectDirectionPerturbation = [&](const Eigen::Vector3d &ypd_gimbal,
+                                                                  std::array<cv::Point2f, 4> &corners) {
+                        const Eigen::Vector3d xyz_camera = tools::R_CAMERA_GIMBAL * tools::calculateXYZ(ypd_gimbal);
+                        const cv::Vec3d tvec_camera(xyz_camera.x(), xyz_camera.y(), xyz_camera.z());
+                        return copyProjectedCorners(pose::projectArmor(classified.geometry.type,
+                                                                       refine_output.rvec,
+                                                                       tvec_camera,
+                                                                       camera_matrix_,
+                                                                       distortion_coefficients_),
+                                                    corners);
+                    };
+
+                    const Eigen::Vector3d final_ypd_gimbal = final_pose.ypd_gimbal;
+                    auto dir_yaw_ypd = final_ypd_gimbal;
+                    dir_yaw_ypd.x() += pose_perturbation_params_.dir_yaw_delta_rad;
+                    auto dir_pitch_ypd = final_ypd_gimbal;
+                    dir_pitch_ypd.y() += pose_perturbation_params_.dir_pitch_delta_rad;
+                    auto distance_ypd = final_ypd_gimbal;
+                    distance_ypd.z() += pose_perturbation_params_.distance_delta_m;
+
+                    auto &perturbed = rec.perturbation_projected_corners;
+                    const bool direction_corners_available =
+                        projectDirectionPerturbation(dir_yaw_ypd, perturbed.dir_yaw_corners) &&
+                        projectDirectionPerturbation(dir_pitch_ypd, perturbed.dir_pitch_corners) &&
+                        projectDirectionPerturbation(distance_ypd, perturbed.distance_corners);
+
+                    const Eigen::Matrix3d r_gimbal_armor =
+                        tools::R_GIMBAL_CAMERA * pose::rotationMatrixFromRvec(refine_output.rvec);
+                    const Eigen::Matrix3d r_pose_yaw =
+                        Eigen::AngleAxisd(pose_perturbation_params_.pose_yaw_delta_rad, Eigen::Vector3d::UnitZ())
+                            .toRotationMatrix();
+                    const Eigen::Matrix3d r_camera_armor = tools::R_CAMERA_GIMBAL * r_pose_yaw * r_gimbal_armor;
+                    cv::Mat r_camera_armor_cv;
+                    cv::eigen2cv(r_camera_armor, r_camera_armor_cv);
+                    cv::Vec3d pose_yaw_rvec;
+                    cv::Rodrigues(r_camera_armor_cv, pose_yaw_rvec);
+                    const bool pose_yaw_corners_available =
+                        copyProjectedCorners(pose::projectArmor(classified.geometry.type,
+                                                                pose_yaw_rvec,
+                                                                refine_output.tvec,
+                                                                camera_matrix_,
+                                                                distortion_coefficients_),
+                                             perturbed.pose_yaw_corners);
+                    perturbed.available = direction_corners_available && pose_yaw_corners_available;
+                }
             }
             pose_debug_.refine_records.push_back(rec);
 

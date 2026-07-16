@@ -123,6 +123,14 @@ namespace armor_detector::debug {
         std::vector<cv::Mat> number_rois;
     };
 
+    struct PosePerturbationProjectedCorners {
+        bool available = false;
+        std::array<cv::Point2f, 4> dir_yaw_corners{};
+        std::array<cv::Point2f, 4> dir_pitch_corners{};
+        std::array<cv::Point2f, 4> distance_corners{};
+        std::array<cv::Point2f, 4> pose_yaw_corners{};
+    };
+
     struct PoseRefineDebugRecord {
         std::size_t armor_index = 0;
 
@@ -150,6 +158,7 @@ namespace armor_detector::debug {
 
         bool has_projected_corners = false;
         std::array<cv::Point2f, 4> projected_corners{};
+        PosePerturbationProjectedCorners perturbation_projected_corners;
     };
 
     struct PoseDebugData {

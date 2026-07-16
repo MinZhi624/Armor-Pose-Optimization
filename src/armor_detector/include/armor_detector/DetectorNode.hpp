@@ -35,6 +35,12 @@ namespace armor_detector {
         bool corner_correction = false;
         bool pose = false;
         bool pose_refine = false;
+        bool pose_perturb_enabled = true;
+        bool pose_perturb_show = false;
+        double pose_perturb_dir_yaw_delta_deg = 1.0;
+        double pose_perturb_dir_pitch_delta_deg = 1.0;
+        double pose_perturb_distance_delta_m = 0.1;
+        double pose_perturb_pose_yaw_delta_deg = 5.0;
         bool result = true;
         std::size_t stats_interval = 50;
 

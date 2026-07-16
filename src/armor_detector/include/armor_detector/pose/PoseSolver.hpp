@@ -16,10 +16,19 @@ namespace armor_detector {
 
     class PoseSolver {
     public:
+        struct PosePerturbationParams {
+            bool enabled = false;
+            double dir_yaw_delta_rad = 0.0;
+            double dir_pitch_delta_rad = 0.0;
+            double distance_delta_m = 0.0;
+            double pose_yaw_delta_rad = 0.0;
+        };
+
         PoseSolver() = default;
         PoseSolver(const CameraInfo &camera_info);
 
         void init(const CameraInfo &camera_info);
+        void setPosePerturbationParams(const PosePerturbationParams &params);
 
         std::vector<SolvedArmor> solve(const std::vector<DetectedArmor> &armors,
                                        const pose::PoseRefineRunner &pose_refiner);
@@ -63,6 +72,7 @@ namespace armor_detector {
         cv::Vec<double, 5> distortion_coefficients_ = {0.0, 0.0, 0.0, 0.0, 0.0};
         Eigen::Matrix3d R_gimbal_world_ = Eigen::Matrix3d::Identity();
         std::unordered_map<int, std::vector<LastArmorYawRecord>> record_;
+        PosePerturbationParams pose_perturbation_params_;
         debug::PoseDebugData pose_debug_;
     };
 

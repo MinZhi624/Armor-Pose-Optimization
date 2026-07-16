@@ -48,11 +48,15 @@ GUI 线程每轮执行以下步骤：
 
 ## 当前窗口注册表
 
-当前主循环只提交一个窗口：
+当前主循环和 Pose Refine 调试会提交以下窗口：
 
 | 窗口名 | 图像来源 | 缩放 | 显示条件 | 说明 |
 |---|---|---:|---|---|
 | `RESULT` | `DebugFrameContext::display_bgr` | `0.5` | RESULT 图层开启且当前帧已处理 | 最终调试画面，包含 `DebugTiming` 的耗时文字 |
+| `pose_perturb_dir_yaw` | `DebugFrameContext::source_bgr` 副本 | `1.0` | POSE_REFINE 图层开启且有成功的扰动投影 | 基准框与 `+dir_yaw` 扰动框 |
+| `pose_perturb_dir_pitch` | `DebugFrameContext::source_bgr` 副本 | `1.0` | POSE_REFINE 图层开启且有成功的扰动投影 | 基准框与 `+dir_pitch` 扰动框 |
+| `pose_perturb_distance` | `DebugFrameContext::source_bgr` 副本 | `1.0` | POSE_REFINE 图层开启且有成功的扰动投影 | 基准框与 `+distance` 扰动框 |
+| `pose_perturb_pose_yaw` | `DebugFrameContext::source_bgr` 副本 | `1.0` | POSE_REFINE 图层开启且有成功的扰动投影 | 基准框与 `+pose_yaw` 扰动框 |
 
 按 `0` 会切换 RESULT 图层。关闭时主线程调用 `clearFrame("RESULT")`，GUI 线程随后销毁该窗口；重新开启后，下一帧提交时会再次显示。
 
@@ -63,6 +67,8 @@ GUI 线程每轮执行以下步骤：
 | 窗口 | 位置 | 内容 | 颜色(BGR) | 样式 | 条件 |
 |---|---|---|---|---|---|
 | `RESULT` | 左上锚点 `(10, 24)` | 当前帧 `Process: <ms> ms` | `(0, 165, 255)` | `FONT_HERSHEY_SIMPLEX`，scale `0.6`，thickness `2`，`LINE_AA` | `display_bgr` 非空 |
+| `pose_perturb_*` | 装甲板四边 | 基准重投影框 | `(255, 255, 0)` | 1 px，`LINE_AA` | Pose Refine 成功 |
+| `pose_perturb_*` | 装甲板四边 | 单项正向扰动重投影框 | `(0, 0, 255)` | 1 px，`LINE_AA` | Pose Refine 成功 |
 
 新增显示元素时：
 
