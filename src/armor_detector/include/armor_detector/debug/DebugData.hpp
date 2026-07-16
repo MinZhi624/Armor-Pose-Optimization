@@ -5,7 +5,9 @@
 #include <builtin_interfaces/msg/time.hpp>
 #include <opencv2/core.hpp>
 
+#include <array>
 #include <cstddef>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -191,9 +193,98 @@ namespace armor_detector::debug {
         PosePerturbationProjectedCorners perturbation_projected_corners;
     };
 
+    struct PoseLandscapeMetric {
+        bool valid = false;
+        std::string status = "not_evaluated";
+        double cost = std::numeric_limits<double>::quiet_NaN();
+        double mean_residual_px = std::numeric_limits<double>::quiet_NaN();
+    };
+
+    struct PoseLandscapeGridPoint {
+        std::size_t distance_index = 0;
+        std::size_t pose_yaw_index = 0;
+        double distance_m = std::numeric_limits<double>::quiet_NaN();
+        double pose_yaw_rad = std::numeric_limits<double>::quiet_NaN();
+        bool valid = false;
+        std::string status = "not_evaluated";
+        double cost = std::numeric_limits<double>::quiet_NaN();
+        double mean_residual_px = std::numeric_limits<double>::quiet_NaN();
+    };
+
+    struct PoseLandscapeMarker {
+        std::string name;
+        bool available = false;
+        bool inside_grid = false;
+        std::string status = "not_evaluated";
+        double distance_m = std::numeric_limits<double>::quiet_NaN();
+        double pose_yaw_rad = std::numeric_limits<double>::quiet_NaN();
+        PoseLandscapeMetric actual_metric;
+        PoseLandscapeMetric slice_metric;
+        double direction_delta_yaw_rad = std::numeric_limits<double>::quiet_NaN();
+        double direction_delta_pitch_rad = std::numeric_limits<double>::quiet_NaN();
+    };
+
+    /**
+     * @brief 单个 PnP 样本的固定视线 d-pose_yaw landscape。
+     *
+     * 只保留数值、字符串和角点值；不保存 cv::Mat 或跨帧图像引用。
+     */
+    struct PoseLandscapeSample {
+        bool valid = false;
+        std::string status = "not_analyzed";
+
+        std::size_t armor_index = 0;
+        int armor_name = 0;
+        std::string armor_type;
+        double confidence = 0.0;
+        std::array<cv::Point2f, 4> image_corners{};
+        std::array<double, 9> camera_matrix{};
+        std::array<double, 5> distortion_coefficients{};
+
+        double fixed_dir_yaw_rad = std::numeric_limits<double>::quiet_NaN();
+        double fixed_dir_pitch_rad = std::numeric_limits<double>::quiet_NaN();
+        double pnp_distance_m = std::numeric_limits<double>::quiet_NaN();
+        double pnp_pose_yaw_rad = std::numeric_limits<double>::quiet_NaN();
+
+        double physical_min_distance_m = std::numeric_limits<double>::quiet_NaN();
+        double physical_max_distance_m = std::numeric_limits<double>::quiet_NaN();
+        double requested_distance_min_m = std::numeric_limits<double>::quiet_NaN();
+        double requested_distance_max_m = std::numeric_limits<double>::quiet_NaN();
+        double actual_distance_min_m = std::numeric_limits<double>::quiet_NaN();
+        double actual_distance_max_m = std::numeric_limits<double>::quiet_NaN();
+        double distance_step_m = std::numeric_limits<double>::quiet_NaN();
+        double requested_pose_yaw_min_rad = std::numeric_limits<double>::quiet_NaN();
+        double requested_pose_yaw_max_rad = std::numeric_limits<double>::quiet_NaN();
+        double actual_pose_yaw_min_rad = std::numeric_limits<double>::quiet_NaN();
+        double actual_pose_yaw_max_rad = std::numeric_limits<double>::quiet_NaN();
+        double pose_yaw_step_rad = std::numeric_limits<double>::quiet_NaN();
+        std::size_t distance_count = 0;
+        std::size_t pose_yaw_count = 0;
+        double huber_loss_scale_px = std::numeric_limits<double>::quiet_NaN();
+
+        bool yaw_search_success = false;
+        std::string yaw_search_status = "not_run";
+        bool ba_success = false;
+        std::string ba_status = "not_run";
+        bool ba_solver_summary_available = false;
+        double ba_initial_cost = std::numeric_limits<double>::quiet_NaN();
+        double ba_final_cost = std::numeric_limits<double>::quiet_NaN();
+        int ba_num_iterations = 0;
+        std::string ba_termination_type = "not_run";
+
+        double yaw_search_elapsed_ms = 0.0;
+        double ba_elapsed_ms = 0.0;
+        double grid_elapsed_ms = 0.0;
+        double scan_elapsed_ms = 0.0;
+
+        std::vector<PoseLandscapeGridPoint> grid;
+        std::vector<PoseLandscapeMarker> markers;
+    };
+
     struct PoseDebugData {
         std::vector<SolvedArmor> solved_armors;
         std::vector<PoseRefineDebugRecord> refine_records;
+        std::vector<PoseLandscapeSample> landscape_samples;
         std::vector<StageTiming> timings;
     };
 } // namespace armor_detector::debug

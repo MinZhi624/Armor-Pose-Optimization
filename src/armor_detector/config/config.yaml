@@ -103,6 +103,18 @@ armor_detector_node_cpp:
         enabled: false
         root_dir: ""
         video: "manual"
+      pose_landscape:
+        # 固定 PnP 视线的 d-pose_yaw 批量 objective 实验；默认不影响生产链。
+        enabled: false
+        root_dir: ""
+        video: "manual"
+        physical_min_distance_m: 1.0
+        physical_max_distance_m: 10.0
+        half_window_m: 3.0
+        distance_step_m: 0.05
+        pose_yaw_min_deg: -70.0
+        pose_yaw_max_deg: 70.0
+        pose_yaw_step_deg: 2.0
       pose_refine_topic:
         enabled: true
       stats_interval: 50

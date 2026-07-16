@@ -28,6 +28,8 @@ add_executable(armor_detector_node
   src/CameraProvider.cpp
   src/pose/PoseSolver.cpp
   src/pose/PoseProjection.cpp
+  src/pose/Pose4DofCostEvaluator.cpp
+  src/pose/PoseLandscapeAnalyzer.cpp
   src/pose/PoseRefineData.cpp
   src/pose/PoseRefineRunner.cpp
   src/pose/NoneRefiner.cpp
@@ -55,6 +57,7 @@ add_executable(armor_detector_node
   src/debug/DebugCornerCorrectionView.cpp
   src/debug/DebugPoseRefineStats.cpp
   src/debug/DebugPoseRefineCsvWriter.cpp
+  src/debug/DebugPoseLandscapeCsvWriter.cpp
   src/debug/DebugPoseRefineView.cpp
   src/debug/DebugArmorYawPublisher.cpp
   src/detector/YoloBackend.cpp
@@ -90,10 +93,32 @@ install(DIRECTORY
 )
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
+
+  ament_add_gtest(pose_landscape_test
+    test/PoseLandscapeTest.cpp
+    src/pose/Pose4DofCostEvaluator.cpp
+    src/pose/PoseLandscapeAnalyzer.cpp
+    src/pose/PoseProjection.cpp
+    src/pose/PoseOnlyBa4DofXYZRefiner.cpp
+    src/pose/PoseOnlyBa4DofYPDRefiner.cpp
+    src/pose/YawSearchRefiner.cpp
+  )
+  if(TARGET pose_landscape_test)
+    ament_target_dependencies(pose_landscape_test rclcpp)
+    target_include_directories(pose_landscape_test PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+      ${EIGEN3_INCLUDE_DIRS}
+    )
+    target_link_libraries(pose_landscape_test ${OpenCV_LIBS} Eigen3::Eigen Ceres::ceres)
+  endif()
+
   ament_lint_auto_find_test_dependencies()
+  set(armor_detector_lint_hook_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+  ament_register_extension("ament_lint_auto" "armor_detector_lint_hook" "disable_uncrustify.cmake")
 endif()
 
 ament_package()

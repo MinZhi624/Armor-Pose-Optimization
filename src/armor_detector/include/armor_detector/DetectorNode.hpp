@@ -50,6 +50,18 @@ namespace armor_detector {
         std::string pose_refine_csv_video = "manual";
         std::string pose_refine_csv_corner_method;
 
+        // Pose landscape experiment
+        bool pose_landscape_enabled = false;
+        std::string pose_landscape_root_dir;
+        std::string pose_landscape_video = "manual";
+        double pose_landscape_physical_min_distance_m = 1.0;
+        double pose_landscape_physical_max_distance_m = 10.0;
+        double pose_landscape_half_window_m = 3.0;
+        double pose_landscape_distance_step_m = 0.05;
+        double pose_landscape_pose_yaw_min_deg = -70.0;
+        double pose_landscape_pose_yaw_max_deg = 70.0;
+        double pose_landscape_pose_yaw_step_deg = 2.0;
+
         // Pose refine topic
         bool pose_refine_topic_enabled = true;
     };
@@ -73,6 +85,7 @@ namespace armor_detector {
         void run(const sensor_msgs::msg::Image::SharedPtr &msg);
         void pollDebugKeys();
         void sendPlayNext();
+        void schedulePlayNextRetry();
 
         // 检测组件
         CameraProvider camera_provider_;
@@ -102,6 +115,7 @@ namespace armor_detector {
         bool step_playback_ = false;
         bool play_next_in_flight_ = false;
         bool play_next_needed_ = false;
+        std::size_t play_next_retry_count_ = 0;
         rclcpp::TimerBase::SharedPtr play_next_timer_;
 
         std::size_t frame_index_ = 0;

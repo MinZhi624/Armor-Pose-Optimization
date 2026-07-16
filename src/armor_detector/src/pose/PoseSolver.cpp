@@ -1,4 +1,5 @@
 #include "armor_detector/pose/PoseSolver.hpp"
+#include "armor_detector/pose/Pose4DofCostEvaluator.hpp"
 #include "armor_detector/pose/PoseProjection.hpp"
 #include "armor_detector/tools/angle.hpp"
 #include "armor_detector/tools/armor_geometry.hpp"
@@ -42,48 +43,11 @@ namespace armor_detector {
             return true;
         }
 
-        double calculate4DofModelMeanError(ArmorType armor_type,
-                                           const std::array<cv::Point2f, 4> &image_corners,
+        double calculate4DofModelMeanError(const pose::Pose4DofObservation &observation,
                                            const Eigen::Vector3d &xyz_gimbal,
-                                           double yaw_rad,
-                                           const cv::Matx33d &camera_matrix,
-                                           const cv::Vec<double, 5> &distortion_coefficients) {
-            if (armor_type == ArmorType::NONE) {
-                return 0.0;
-            }
-
-            const auto &object_points = (armor_type == ArmorType::LARGE) ? LARGE_ARMOR_POINTS : SMALL_ARMOR_POINTS;
-
-            const std::vector<cv::Point2d> image_corners_vec(image_corners.begin(), image_corners.end());
-            std::vector<cv::Point2d> norm_points;
-            cv::undistortPoints(
-                image_corners_vec, norm_points, cv::Mat(camera_matrix), distortionMat(distortion_coefficients));
-
-            const double fx = camera_matrix(0, 0);
-            const double fy = camera_matrix(1, 1);
-            const double pitch = tools::ARMOR_PITCH_RAD;
-
-            const auto R_pitch = Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()).toRotationMatrix();
-            const auto R_yaw = Eigen::AngleAxisd(yaw_rad, Eigen::Vector3d::UnitZ()).toRotationMatrix();
-            const Eigen::Matrix3d R_gimbal_armor = R_yaw * R_pitch;
-
-            double total_error = 0.0;
-            for (std::size_t i = 0; i < 4; ++i) {
-                const Eigen::Vector3d p_armor(object_points[i].x, object_points[i].y, object_points[i].z);
-                const Eigen::Vector3d p_gimbal = R_gimbal_armor * p_armor + xyz_gimbal;
-
-                const Eigen::Vector3d p_camera(-p_gimbal.y(), -p_gimbal.z(), p_gimbal.x());
-
-                const double x_pred = p_camera.x() / p_camera.z();
-                const double y_pred = p_camera.y() / p_camera.z();
-
-                const double dx = fx * (x_pred - norm_points[i].x);
-                const double dy = fy * (y_pred - norm_points[i].y);
-
-                total_error += std::sqrt(dx * dx + dy * dy);
-            }
-
-            return total_error / 4.0;
+                                           double yaw_rad) {
+            const auto evaluation = pose::evaluatePose4DofCost(observation, xyz_gimbal, yaw_rad);
+            return evaluation.valid ? evaluation.mean_residual_px : 0.0;
         }
     } // namespace
 
@@ -102,12 +66,17 @@ namespace armor_detector {
         pose_perturbation_params_ = params;
     }
 
+    void PoseSolver::setPoseLandscapeParams(const pose::PoseLandscapeParams &params) {
+        pose_landscape_analyzer_ = pose::PoseLandscapeAnalyzer(params);
+    }
+
     // ===================== 主流程 =====================
 
     std::vector<SolvedArmor> PoseSolver::solve(const std::vector<DetectedArmor> &armors,
                                                const pose::PoseRefineRunner &pose_refiner) {
         pose_debug_.refine_records.clear();
         pose_debug_.solved_armors.clear();
+        pose_debug_.landscape_samples.clear();
         pose_debug_.timings.clear();
 
         double pnp_elapsed_ms = 0.0;
@@ -157,6 +126,24 @@ namespace armor_detector {
             refine_input.camera_matrix = camera_matrix_;
             refine_input.distortion_coefficients = distortion_coefficients_;
 
+            const std::size_t armor_index = solved_armors.size();
+            if (pose_landscape_analyzer_.params().enabled) {
+                pose::PoseLandscapeSampleInfo sample_info;
+                sample_info.armor_index = armor_index;
+                sample_info.armor_name = static_cast<int>(classified.classification.name);
+                if (classified.geometry.type == ArmorType::LARGE) {
+                    sample_info.armor_type = "large";
+                }
+                else if (classified.geometry.type == ArmorType::SMALL) {
+                    sample_info.armor_type = "small";
+                }
+                else {
+                    sample_info.armor_type = "none";
+                }
+                sample_info.confidence = classified.classification.confidence;
+                pose_debug_.landscape_samples.push_back(pose_landscape_analyzer_.analyze(refine_input, sample_info));
+            }
+
             const double initial_error = pose_refiner.calculateInitialError(refine_input);
             const double reprojection_point_count = static_cast<double>(refine_input.image_corners.size());
             const auto refine_output = pose_refiner.refine(refine_input);
@@ -167,7 +154,7 @@ namespace armor_detector {
 
             // Fill debug record with full fields
             debug::PoseRefineDebugRecord rec;
-            rec.armor_index = solved_armors.size();
+            rec.armor_index = armor_index;
             rec.armor_name = static_cast<int>(classified.classification.name);
             rec.armor_type = (classified.geometry.type == ArmorType::LARGE) ? "large"
                 : (classified.geometry.type == ArmorType::SMALL)            ? "small"
@@ -201,18 +188,11 @@ namespace armor_detector {
             rec.initial_reproj_mean_px = rec.initial_reproj_sum_px / reprojection_point_count;
             rec.final_reproj_mean_px = rec.final_reproj_sum_px / reprojection_point_count;
             rec.delta_reproj_mean_px = rec.final_reproj_mean_px - rec.initial_reproj_mean_px;
-            rec.ba_model_initial_reproj_mean_px = calculate4DofModelMeanError(classified.geometry.type,
-                                                                              refine_input.image_corners,
-                                                                              initial_pose.xyz_gimbal,
-                                                                              initial_pose.ypr_gimbal.x(),
-                                                                              camera_matrix_,
-                                                                              distortion_coefficients_);
-            rec.ba_model_final_reproj_mean_px = calculate4DofModelMeanError(classified.geometry.type,
-                                                                            refine_input.image_corners,
-                                                                            final_pose.xyz_gimbal,
-                                                                            final_pose.ypr_gimbal.x(),
-                                                                            camera_matrix_,
-                                                                            distortion_coefficients_);
+            const pose::Pose4DofObservation ba_model_observation = pose::createPose4DofObservation(refine_input);
+            rec.ba_model_initial_reproj_mean_px =
+                calculate4DofModelMeanError(ba_model_observation, initial_pose.xyz_gimbal, initial_pose.ypr_gimbal.x());
+            rec.ba_model_final_reproj_mean_px =
+                calculate4DofModelMeanError(ba_model_observation, final_pose.xyz_gimbal, final_pose.ypr_gimbal.x());
             rec.has_solver_summary = refine_output.solver_summary.available;
             rec.initial_cost = refine_output.solver_summary.initial_cost;
             rec.final_cost = refine_output.solver_summary.final_cost;
@@ -285,6 +265,13 @@ namespace armor_detector {
         record_ = std::move(new_record);
         pose_debug_.timings.push_back({"pnp", pnp_elapsed_ms});
         pose_debug_.timings.push_back({"refine", refine_elapsed_ms});
+        if (!pose_debug_.landscape_samples.empty()) {
+            double landscape_elapsed_ms = 0.0;
+            for (const auto &sample : pose_debug_.landscape_samples) {
+                landscape_elapsed_ms += sample.scan_elapsed_ms;
+            }
+            pose_debug_.timings.push_back({"pose_landscape", landscape_elapsed_ms});
+        }
 
         pose_debug_.solved_armors = solved_armors;
         return solved_armors;

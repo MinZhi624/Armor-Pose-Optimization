@@ -1,6 +1,7 @@
 #pragma once
 
 #include "armor_detector/debug/DebugData.hpp"
+#include "armor_detector/pose/PoseLandscapeAnalyzer.hpp"
 #include "armor_detector/pose/PoseRefineRunner.hpp"
 #include "armor_detector/types/ArmorData.hpp"
 #include "armor_detector/types/CameraInfo.hpp"
@@ -29,6 +30,7 @@ namespace armor_detector {
 
         void init(const CameraInfo &camera_info);
         void setPosePerturbationParams(const PosePerturbationParams &params);
+        void setPoseLandscapeParams(const pose::PoseLandscapeParams &params);
 
         std::vector<SolvedArmor> solve(const std::vector<DetectedArmor> &armors,
                                        const pose::PoseRefineRunner &pose_refiner);
@@ -73,6 +75,7 @@ namespace armor_detector {
         Eigen::Matrix3d R_gimbal_world_ = Eigen::Matrix3d::Identity();
         std::unordered_map<int, std::vector<LastArmorYawRecord>> record_;
         PosePerturbationParams pose_perturbation_params_;
+        pose::PoseLandscapeAnalyzer pose_landscape_analyzer_;
         debug::PoseDebugData pose_debug_;
     };
 

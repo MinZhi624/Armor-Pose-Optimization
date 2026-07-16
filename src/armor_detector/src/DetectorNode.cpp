@@ -5,6 +5,7 @@
 #include "armor_detector/debug/DebugCornerCorrection.hpp"
 #include "armor_detector/debug/DebugLayerController.hpp"
 #include "armor_detector/debug/DebugLight.hpp"
+#include "armor_detector/debug/DebugPoseLandscapeCsvWriter.hpp"
 #include "armor_detector/debug/DebugPoseRefine.hpp"
 #include "armor_detector/debug/DebugPoseRefineCsvWriter.hpp"
 #include "armor_detector/debug/DebugPoseRefineStats.hpp"
@@ -36,12 +37,7 @@ namespace armor_detector {
         // Step 模式：等待 service ready 后发送第一帧请求
         if (step_playback_) {
             RCLCPP_INFO(this->get_logger(), "Step 播放模式: 等待 play_next service...");
-            play_next_timer_ = this->create_wall_timer(std::chrono::milliseconds(100), [this]() {
-                if (play_next_client_ && play_next_client_->service_is_ready()) {
-                    play_next_timer_->cancel();
-                    sendPlayNext();
-                }
-            });
+            schedulePlayNextRetry();
         }
 
         RCLCPP_INFO(this->get_logger(), "armor_detector节点已启动.");
@@ -84,6 +80,25 @@ namespace armor_detector {
             this->declare_parameter<std::string>("debug.pose_refine_csv.root_dir", "");
         debug_config_.pose_refine_csv_video =
             this->declare_parameter<std::string>("debug.pose_refine_csv.video", "manual");
+        debug_config_.pose_landscape_enabled = this->declare_parameter<bool>("debug.pose_landscape.enabled", false);
+        debug_config_.pose_landscape_root_dir =
+            this->declare_parameter<std::string>("debug.pose_landscape.root_dir", "");
+        debug_config_.pose_landscape_video =
+            this->declare_parameter<std::string>("debug.pose_landscape.video", "manual");
+        debug_config_.pose_landscape_physical_min_distance_m =
+            this->declare_parameter<double>("debug.pose_landscape.physical_min_distance_m", 1.0);
+        debug_config_.pose_landscape_physical_max_distance_m =
+            this->declare_parameter<double>("debug.pose_landscape.physical_max_distance_m", 10.0);
+        debug_config_.pose_landscape_half_window_m =
+            this->declare_parameter<double>("debug.pose_landscape.half_window_m", 3.0);
+        debug_config_.pose_landscape_distance_step_m =
+            this->declare_parameter<double>("debug.pose_landscape.distance_step_m", 0.05);
+        debug_config_.pose_landscape_pose_yaw_min_deg =
+            this->declare_parameter<double>("debug.pose_landscape.pose_yaw_min_deg", -70.0);
+        debug_config_.pose_landscape_pose_yaw_max_deg =
+            this->declare_parameter<double>("debug.pose_landscape.pose_yaw_max_deg", 70.0);
+        debug_config_.pose_landscape_pose_yaw_step_deg =
+            this->declare_parameter<double>("debug.pose_landscape.pose_yaw_step_deg", 2.0);
         debug_config_.pose_refine_topic_enabled =
             this->declare_parameter<bool>("debug.pose_refine_topic.enabled", true);
 
@@ -115,6 +130,17 @@ namespace armor_detector {
         perturbation_params.distance_delta_m = debug_config_.pose_perturb_distance_delta_m;
         perturbation_params.pose_yaw_delta_rad = tools::degToRad(debug_config_.pose_perturb_pose_yaw_delta_deg);
         pose_solver_.setPosePerturbationParams(perturbation_params);
+
+        pose::PoseLandscapeParams landscape_params;
+        landscape_params.enabled = debug_config_.pose_landscape_enabled;
+        landscape_params.physical_min_distance_m = debug_config_.pose_landscape_physical_min_distance_m;
+        landscape_params.physical_max_distance_m = debug_config_.pose_landscape_physical_max_distance_m;
+        landscape_params.half_window_m = debug_config_.pose_landscape_half_window_m;
+        landscape_params.distance_step_m = debug_config_.pose_landscape_distance_step_m;
+        landscape_params.pose_yaw_min_deg = debug_config_.pose_landscape_pose_yaw_min_deg;
+        landscape_params.pose_yaw_max_deg = debug_config_.pose_landscape_pose_yaw_max_deg;
+        landscape_params.pose_yaw_step_deg = debug_config_.pose_landscape_pose_yaw_step_deg;
+        pose_solver_.setPoseLandscapeParams(landscape_params);
 
         auto package_share = ament_index_cpp::get_package_share_directory("armor_detector");
 
@@ -288,6 +314,11 @@ namespace armor_detector {
                                                                   pose_refiner_.methodName()));
         }
 
+        if (debug_config_.pose_landscape_enabled) {
+            debug_hub_.addObserver(std::make_shared<debug::DebugPoseLandscapeCsvWriter>(
+                debug_config_.pose_landscape_root_dir, debug_config_.pose_landscape_video));
+        }
+
         if (debug_config_.pose_refine_topic_enabled) {
             debug_hub_.addObserver(std::make_shared<debug::DebugArmorYawPublisher>(*this, layer_state_));
         }
@@ -382,8 +413,30 @@ namespace armor_detector {
 
     // ===================== Step 播放 =====================
 
+    void DetectorNode::schedulePlayNextRetry() {
+        if (!step_playback_ || !rclcpp::ok()) {
+            return;
+        }
+        if (play_next_timer_) {
+            play_next_timer_->cancel();
+        }
+        play_next_timer_ = this->create_wall_timer(std::chrono::milliseconds(100), [this]() {
+            play_next_timer_->cancel();
+            if (!play_next_client_ || !play_next_client_->service_is_ready()) {
+                schedulePlayNextRetry();
+                return;
+            }
+            sendPlayNext();
+        });
+    }
+
     void DetectorNode::sendPlayNext() {
-        if (play_next_in_flight_ || !play_next_client_ || !play_next_client_->service_is_ready()) {
+        if (play_next_in_flight_ || !play_next_client_) {
+            return;
+        }
+        if (!play_next_client_->service_is_ready()) {
+            play_next_needed_ = true;
+            schedulePlayNextRetry();
             return;
         }
         play_next_in_flight_ = true;
@@ -393,6 +446,17 @@ namespace armor_detector {
             [this](rclcpp::Client<rosbag2_interfaces::srv::PlayNext>::SharedFuture future) {
                 play_next_in_flight_ = false;
                 if (!future.get()->success) {
+                    constexpr std::size_t kMaxInitialPlayNextRetries = 30;
+                    if (processed_frame_count_ == 0 && play_next_retry_count_ < kMaxInitialPlayNextRetries) {
+                        ++play_next_retry_count_;
+                        play_next_needed_ = true;
+                        RCLCPP_WARN(this->get_logger(),
+                                    "play_next 首帧尚未就绪，100ms 后重试 (%zu/%zu)",
+                                    play_next_retry_count_,
+                                    kMaxInitialPlayNextRetries);
+                        schedulePlayNextRetry();
+                        return;
+                    }
                     // 实验完整播放场景：rosbag 播完不算错误
                     if (processed_frame_count_ > 0 && exit_on_complete_ && max_frames_ == 0) {
                         RCLCPP_INFO(this->get_logger(), "rosbag 播完 (共 %zu 帧), 正常退出", processed_frame_count_);
@@ -403,6 +467,7 @@ namespace armor_detector {
                     rclcpp::shutdown();
                     return;
                 }
+                play_next_retry_count_ = 0;
                 if (play_next_needed_) {
                     sendPlayNext();
                 }
