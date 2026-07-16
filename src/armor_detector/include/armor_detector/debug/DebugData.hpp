@@ -148,6 +148,18 @@ namespace armor_detector::debug {
         Eigen::Vector3d final_xyz_gimbal = Eigen::Vector3d::Zero();
         Eigen::Vector3d delta_xyz_gimbal = Eigen::Vector3d::Zero();
 
+        double initial_dir_yaw_rad = 0.0;
+        double final_dir_yaw_rad = 0.0;
+        double delta_dir_yaw_rad = 0.0;
+
+        double initial_dir_pitch_rad = 0.0;
+        double final_dir_pitch_rad = 0.0;
+        double delta_dir_pitch_rad = 0.0;
+
+        double initial_distance_m = 0.0;
+        double final_distance_m = 0.0;
+        double delta_distance_m = 0.0;
+
         double initial_yaw_rad = 0.0;
         double final_yaw_rad = 0.0;
         double delta_yaw_rad = 0.0;
@@ -155,6 +167,24 @@ namespace armor_detector::debug {
         double initial_reprojection_error_px = 0.0;
         double final_reprojection_error_px = 0.0;
         double delta_reprojection_error_px = 0.0;
+
+        double initial_reproj_sum_px = 0.0;
+        double final_reproj_sum_px = 0.0;
+        double delta_reproj_sum_px = 0.0;
+
+        double initial_reproj_mean_px = 0.0;
+        double final_reproj_mean_px = 0.0;
+        double delta_reproj_mean_px = 0.0;
+
+        double ba_model_initial_reproj_mean_px = 0.0;
+        double ba_model_final_reproj_mean_px = 0.0;
+
+        bool has_solver_summary = false;
+        double initial_cost = 0.0;
+        double final_cost = 0.0;
+        double delta_cost = 0.0;
+        int num_iterations = 0;
+        std::string termination_type = "not_run";
 
         bool has_projected_corners = false;
         std::array<cv::Point2f, 4> projected_corners{};

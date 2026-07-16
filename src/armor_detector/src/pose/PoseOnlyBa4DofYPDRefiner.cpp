@@ -150,6 +150,12 @@ namespace armor_detector::pose {
 
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
+        output.solver_summary.available = true;
+        output.solver_summary.initial_cost = summary.initial_cost;
+        output.solver_summary.final_cost = summary.final_cost;
+        output.solver_summary.num_iterations =
+            summary.iterations.empty() ? 0 : static_cast<int>(summary.iterations.size() - 1);
+        output.solver_summary.termination_type = ceres::TerminationTypeToString(summary.termination_type);
 
         if (!summary.IsSolutionUsable() || !isFinitePose4D(pose)) {
             return output;

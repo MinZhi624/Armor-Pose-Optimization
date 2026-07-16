@@ -49,7 +49,14 @@ namespace armor_detector::debug {
         file_ << "frame_index,stamp_sec,stamp_nanosec," << "armor_index,armor_name,armor_type,confidence,"
               << "center_x_px,center_y_px," << "corner_method,method,success," << "initial_x_m,initial_y_m,initial_z_m,"
               << "final_x_m,final_y_m,final_z_m," << "delta_x_m,delta_y_m,delta_z_m,"
-              << "initial_yaw_rad,final_yaw_rad,delta_yaw_rad," << "initial_error_px,final_error_px,delta_error_px\n";
+              << "initial_dir_yaw_rad,final_dir_yaw_rad,delta_dir_yaw_rad,"
+              << "initial_dir_pitch_rad,final_dir_pitch_rad,delta_dir_pitch_rad,"
+              << "initial_distance_m,final_distance_m,delta_distance_m,"
+              << "initial_pose_yaw_rad,final_pose_yaw_rad,delta_pose_yaw_rad,"
+              << "initial_reproj_sum_px,final_reproj_sum_px,delta_reproj_sum_px,"
+              << "initial_reproj_mean_px,final_reproj_mean_px,delta_reproj_mean_px,"
+              << "ba_model_initial_reproj_mean_px,ba_model_final_reproj_mean_px,"
+              << "initial_cost,final_cost,delta_cost,num_iterations,termination_type\n";
     }
 
     void DebugPoseRefineCsvWriter::onPoseSolved(DebugFrameContext &context, const PoseDebugData &data) {
@@ -58,6 +65,12 @@ namespace armor_detector::debug {
         }
 
         for (const auto &record : data.refine_records) {
+            const auto writeCost = [&](double cost) {
+                if (record.has_solver_summary) {
+                    file_ << cost;
+                }
+            };
+
             file_ << std::fixed << std::setprecision(6) << context.frame_index << "," << context.stamp.sec << ","
                   << context.stamp.nanosec << "," << record.armor_index << "," << record.armor_name << ","
                   << record.armor_type << "," << record.confidence << "," << record.center_x_px << ","
@@ -66,10 +79,22 @@ namespace armor_detector::debug {
                   << record.initial_xyz_gimbal.y() << "," << record.initial_xyz_gimbal.z() << ","
                   << record.final_xyz_gimbal.x() << "," << record.final_xyz_gimbal.y() << ","
                   << record.final_xyz_gimbal.z() << "," << record.delta_xyz_gimbal.x() << ","
-                  << record.delta_xyz_gimbal.y() << "," << record.delta_xyz_gimbal.z() << "," << record.initial_yaw_rad
-                  << "," << record.final_yaw_rad << "," << record.delta_yaw_rad << ","
-                  << record.initial_reprojection_error_px << "," << record.final_reprojection_error_px << ","
-                  << record.delta_reprojection_error_px << "\n";
+                  << record.delta_xyz_gimbal.y() << "," << record.delta_xyz_gimbal.z() << ","
+                  << record.initial_dir_yaw_rad << "," << record.final_dir_yaw_rad << "," << record.delta_dir_yaw_rad
+                  << "," << record.initial_dir_pitch_rad << "," << record.final_dir_pitch_rad << ","
+                  << record.delta_dir_pitch_rad << "," << record.initial_distance_m << "," << record.final_distance_m
+                  << "," << record.delta_distance_m << "," << record.initial_yaw_rad << "," << record.final_yaw_rad
+                  << "," << record.delta_yaw_rad << "," << record.initial_reproj_sum_px << ","
+                  << record.final_reproj_sum_px << "," << record.delta_reproj_sum_px << ","
+                  << record.initial_reproj_mean_px << "," << record.final_reproj_mean_px << ","
+                  << record.delta_reproj_mean_px << "," << record.ba_model_initial_reproj_mean_px << ","
+                  << record.ba_model_final_reproj_mean_px << ",";
+            writeCost(record.initial_cost);
+            file_ << ",";
+            writeCost(record.final_cost);
+            file_ << ",";
+            writeCost(record.delta_cost);
+            file_ << "," << record.num_iterations << "," << record.termination_type << "\n";
         }
     }
 

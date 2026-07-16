@@ -20,11 +20,20 @@ namespace armor_detector::pose {
         cv::Vec<double, 5> distortion_coefficients = {0.0, 0.0, 0.0, 0.0, 0.0};
     };
 
+    struct PoseRefineSolverSummary {
+        bool available = false;
+        double initial_cost = 0.0;
+        double final_cost = 0.0;
+        int num_iterations = 0;
+        std::string termination_type = "not_run";
+    };
+
     struct PoseRefineOutput {
         cv::Vec3d rvec = {0.0, 0.0, 0.0};
         cv::Vec3d tvec = {0.0, 0.0, 0.0};
         bool success = false;
         double reprojection_error_px = 0.0;
+        PoseRefineSolverSummary solver_summary;
     };
 
     std::string toString(PoseRefineMethod method);

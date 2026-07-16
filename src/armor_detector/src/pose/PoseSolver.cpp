@@ -41,6 +41,50 @@ namespace armor_detector {
             std::copy(projected.begin(), projected.end(), corners.begin());
             return true;
         }
+
+        double calculate4DofModelMeanError(ArmorType armor_type,
+                                           const std::array<cv::Point2f, 4> &image_corners,
+                                           const Eigen::Vector3d &xyz_gimbal,
+                                           double yaw_rad,
+                                           const cv::Matx33d &camera_matrix,
+                                           const cv::Vec<double, 5> &distortion_coefficients) {
+            if (armor_type == ArmorType::NONE) {
+                return 0.0;
+            }
+
+            const auto &object_points = (armor_type == ArmorType::LARGE) ? LARGE_ARMOR_POINTS : SMALL_ARMOR_POINTS;
+
+            const std::vector<cv::Point2d> image_corners_vec(image_corners.begin(), image_corners.end());
+            std::vector<cv::Point2d> norm_points;
+            cv::undistortPoints(
+                image_corners_vec, norm_points, cv::Mat(camera_matrix), distortionMat(distortion_coefficients));
+
+            const double fx = camera_matrix(0, 0);
+            const double fy = camera_matrix(1, 1);
+            const double pitch = tools::ARMOR_PITCH_RAD;
+
+            const auto R_pitch = Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()).toRotationMatrix();
+            const auto R_yaw = Eigen::AngleAxisd(yaw_rad, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+            const Eigen::Matrix3d R_gimbal_armor = R_yaw * R_pitch;
+
+            double total_error = 0.0;
+            for (std::size_t i = 0; i < 4; ++i) {
+                const Eigen::Vector3d p_armor(object_points[i].x, object_points[i].y, object_points[i].z);
+                const Eigen::Vector3d p_gimbal = R_gimbal_armor * p_armor + xyz_gimbal;
+
+                const Eigen::Vector3d p_camera(-p_gimbal.y(), -p_gimbal.z(), p_gimbal.x());
+
+                const double x_pred = p_camera.x() / p_camera.z();
+                const double y_pred = p_camera.y() / p_camera.z();
+
+                const double dx = fx * (x_pred - norm_points[i].x);
+                const double dy = fy * (y_pred - norm_points[i].y);
+
+                total_error += std::sqrt(dx * dx + dy * dy);
+            }
+
+            return total_error / 4.0;
+        }
     } // namespace
 
     // ===================== 构造 / 初始化 =====================
@@ -114,6 +158,7 @@ namespace armor_detector {
             refine_input.distortion_coefficients = distortion_coefficients_;
 
             const double initial_error = pose_refiner.calculateInitialError(refine_input);
+            const double reprojection_point_count = static_cast<double>(refine_input.image_corners.size());
             const auto refine_output = pose_refiner.refine(refine_input);
             if (refine_output.success) {
                 solved = createSolvedArmorFromRvecTvec(classified, refine_output.rvec, refine_output.tvec);
@@ -135,12 +180,45 @@ namespace armor_detector {
             rec.initial_xyz_gimbal = initial_pose.xyz_gimbal;
             rec.final_xyz_gimbal = final_pose.xyz_gimbal;
             rec.delta_xyz_gimbal = final_pose.xyz_gimbal - initial_pose.xyz_gimbal;
+            rec.initial_dir_yaw_rad = initial_pose.ypd_gimbal.x();
+            rec.final_dir_yaw_rad = final_pose.ypd_gimbal.x();
+            rec.delta_dir_yaw_rad = normalizeRadAngle(rec.final_dir_yaw_rad - rec.initial_dir_yaw_rad);
+            rec.initial_dir_pitch_rad = initial_pose.ypd_gimbal.y();
+            rec.final_dir_pitch_rad = final_pose.ypd_gimbal.y();
+            rec.delta_dir_pitch_rad = rec.final_dir_pitch_rad - rec.initial_dir_pitch_rad;
+            rec.initial_distance_m = initial_pose.ypd_gimbal.z();
+            rec.final_distance_m = final_pose.ypd_gimbal.z();
+            rec.delta_distance_m = rec.final_distance_m - rec.initial_distance_m;
             rec.initial_yaw_rad = initial_pose.ypr_gimbal.x();
             rec.final_yaw_rad = final_pose.ypr_gimbal.x();
             rec.delta_yaw_rad = normalizeRadAngle(rec.final_yaw_rad - rec.initial_yaw_rad);
             rec.initial_reprojection_error_px = initial_error;
             rec.final_reprojection_error_px = refine_output.reprojection_error_px;
             rec.delta_reprojection_error_px = initial_error - refine_output.reprojection_error_px;
+            rec.initial_reproj_sum_px = initial_error;
+            rec.final_reproj_sum_px = refine_output.reprojection_error_px;
+            rec.delta_reproj_sum_px = rec.final_reproj_sum_px - rec.initial_reproj_sum_px;
+            rec.initial_reproj_mean_px = rec.initial_reproj_sum_px / reprojection_point_count;
+            rec.final_reproj_mean_px = rec.final_reproj_sum_px / reprojection_point_count;
+            rec.delta_reproj_mean_px = rec.final_reproj_mean_px - rec.initial_reproj_mean_px;
+            rec.ba_model_initial_reproj_mean_px = calculate4DofModelMeanError(classified.geometry.type,
+                                                                              refine_input.image_corners,
+                                                                              initial_pose.xyz_gimbal,
+                                                                              initial_pose.ypr_gimbal.x(),
+                                                                              camera_matrix_,
+                                                                              distortion_coefficients_);
+            rec.ba_model_final_reproj_mean_px = calculate4DofModelMeanError(classified.geometry.type,
+                                                                            refine_input.image_corners,
+                                                                            final_pose.xyz_gimbal,
+                                                                            final_pose.ypr_gimbal.x(),
+                                                                            camera_matrix_,
+                                                                            distortion_coefficients_);
+            rec.has_solver_summary = refine_output.solver_summary.available;
+            rec.initial_cost = refine_output.solver_summary.initial_cost;
+            rec.final_cost = refine_output.solver_summary.final_cost;
+            rec.delta_cost = rec.final_cost - rec.initial_cost;
+            rec.num_iterations = refine_output.solver_summary.num_iterations;
+            rec.termination_type = refine_output.solver_summary.termination_type;
             if (refine_output.success) {
                 const auto projected_corners = pose::projectArmor(classified.geometry.type,
                                                                   refine_output.rvec,
