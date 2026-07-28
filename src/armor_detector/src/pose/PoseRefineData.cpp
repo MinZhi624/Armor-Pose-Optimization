@@ -2,39 +2,61 @@
 
 namespace armor_detector::pose {
 
-    std::string toString(PoseRefineMethod method) {
+    std::string toString(SinglePoseRefineMethod method) {
         switch (method) {
-            case PoseRefineMethod::NONE:
+            case SinglePoseRefineMethod::NONE:
                 return "none";
-            case PoseRefineMethod::YAW_SEARCH:
+            case SinglePoseRefineMethod::YAW_SEARCH:
                 return "yaw_search";
-            case PoseRefineMethod::POSE_ONLY_BA_6DOF:
+            case SinglePoseRefineMethod::YAW_SEARCH_THEN_DISTANCE:
+                return "yaw_search_then_distance";
+            case SinglePoseRefineMethod::POSE_ONLY_BA_6DOF:
                 return "pose_only_ba_6dof";
-            case PoseRefineMethod::POSE_ONLY_BA_4DOF_XYZ:
+            case SinglePoseRefineMethod::POSE_ONLY_BA_4DOF_XYZ:
                 return "pose_only_ba_4dof_xyz";
-            case PoseRefineMethod::POSE_ONLY_BA_4DOF_YPD:
+            case SinglePoseRefineMethod::POSE_ONLY_BA_4DOF_YPD:
                 return "pose_only_ba_4dof_ypd";
         }
         return "pose_only_ba_4dof_xyz";
     }
 
-    PoseRefineMethod poseRefineMethodFromString(std::string_view name) {
+    SinglePoseRefineMethod singlePoseRefineMethodFromString(std::string_view name) {
         if (name == "none") {
-            return PoseRefineMethod::NONE;
+            return SinglePoseRefineMethod::NONE;
         }
         if (name == "yaw_search") {
-            return PoseRefineMethod::YAW_SEARCH;
+            return SinglePoseRefineMethod::YAW_SEARCH;
+        }
+        if (name == "yaw_search_then_distance") {
+            return SinglePoseRefineMethod::YAW_SEARCH_THEN_DISTANCE;
         }
         if (name == "pose_only_ba_6dof" || name == "ba_6dof") {
-            return PoseRefineMethod::POSE_ONLY_BA_6DOF;
+            return SinglePoseRefineMethod::POSE_ONLY_BA_6DOF;
         }
         if (name == "pose_only_ba_4dof_xyz" || name == "ba_4dof_xyz") {
-            return PoseRefineMethod::POSE_ONLY_BA_4DOF_XYZ;
+            return SinglePoseRefineMethod::POSE_ONLY_BA_4DOF_XYZ;
         }
         if (name == "pose_only_ba_4dof_ypd" || name == "ba_4dof_ypd") {
-            return PoseRefineMethod::POSE_ONLY_BA_4DOF_YPD;
+            return SinglePoseRefineMethod::POSE_ONLY_BA_4DOF_YPD;
         }
-        return PoseRefineMethod::POSE_ONLY_BA_4DOF_XYZ;
+        return SinglePoseRefineMethod::POSE_ONLY_BA_4DOF_XYZ;
+    }
+
+    std::string toString(DualPoseRefineMethod method) {
+        switch (method) {
+            case DualPoseRefineMethod::NONE:
+                return "none";
+            case DualPoseRefineMethod::DUAL_ARMOR_BA_3DOF_YPD:
+                return "dual_armor_ba_3dof_ypd";
+        }
+        return "none";
+    }
+
+    DualPoseRefineMethod dualPoseRefineMethodFromString(std::string_view name) {
+        if (name == "dual_armor_ba_3dof_ypd") {
+            return DualPoseRefineMethod::DUAL_ARMOR_BA_3DOF_YPD;
+        }
+        return DualPoseRefineMethod::NONE;
     }
 
 } // namespace armor_detector::pose

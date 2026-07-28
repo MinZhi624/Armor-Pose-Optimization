@@ -28,14 +28,16 @@ namespace armor_detector::pose {
         }
 
         template <typename T>
-        Eigen::Matrix<T, 3, 1> xyzFromYpd(const T *const pose) {
-            const T dir_yaw = pose[0];
-            const T dir_pitch = pose[1];
-            const T distance = pose[2];
+        Eigen::Matrix<T, 3, 1> xyzFromYpd(const T &dir_yaw, const T &dir_pitch, const T &distance) {
             const T cos_pitch = ceres::cos(dir_pitch);
             return {distance * cos_pitch * ceres::cos(dir_yaw),
                     distance * cos_pitch * ceres::sin(dir_yaw),
                     distance * ceres::sin(dir_pitch)};
+        }
+
+        template <typename T>
+        Eigen::Matrix<T, 3, 1> xyzFromYpd(const T *const pose) {
+            return xyzFromYpd(pose[0], pose[1], pose[2]);
         }
 
         template <typename T>
@@ -88,6 +90,74 @@ namespace armor_detector::pose {
             double fx_ = 0.0;
             double fy_ = 0.0;
             Pose4DofParameterization parameterization_ = Pose4DofParameterization::XYZ;
+        };
+
+        struct Pose4DofDistanceReprojectionResidual {
+            Pose4DofDistanceReprojectionResidual(const cv::Point3d &point_3d,
+                                                 const cv::Point2d &observed_normalized,
+                                                 double fx,
+                                                 double fy,
+                                                 double dir_yaw_rad,
+                                                 double dir_pitch_rad,
+                                                 double pose_yaw_rad) :
+                point_3d_(point_3d), observed_normalized_(observed_normalized), fx_(fx), fy_(fy),
+                dir_yaw_rad_(dir_yaw_rad), dir_pitch_rad_(dir_pitch_rad), pose_yaw_rad_(pose_yaw_rad) {
+            }
+
+            template <typename T>
+            bool operator()(const T *const distance_m, T *residual) const {
+                const Eigen::Matrix<T, 3, 1> xyz_gimbal = xyzFromYpd(T(dir_yaw_rad_), T(dir_pitch_rad_), distance_m[0]);
+                const Eigen::Matrix<T, 3, 1> p_camera =
+                    projectArmorPointToCamera(point_3d_, xyz_gimbal, T(pose_yaw_rad_));
+
+                const T x_pred = p_camera.x() / p_camera.z();
+                const T y_pred = p_camera.y() / p_camera.z();
+                residual[0] = T(fx_) * (x_pred - T(observed_normalized_.x));
+                residual[1] = T(fy_) * (y_pred - T(observed_normalized_.y));
+                return true;
+            }
+
+            cv::Point3d point_3d_;
+            cv::Point2d observed_normalized_;
+            double fx_ = 0.0;
+            double fy_ = 0.0;
+            double dir_yaw_rad_ = 0.0;
+            double dir_pitch_rad_ = 0.0;
+            double pose_yaw_rad_ = 0.0;
+        };
+
+        struct Pose4DofSharedYawDistanceReprojectionResidual {
+            Pose4DofSharedYawDistanceReprojectionResidual(const cv::Point3d &point_3d,
+                                                          const cv::Point2d &observed_normalized,
+                                                          double fx,
+                                                          double fy,
+                                                          double dir_yaw_rad,
+                                                          double dir_pitch_rad,
+                                                          double yaw_offset_rad) :
+                point_3d_(point_3d), observed_normalized_(observed_normalized), fx_(fx), fy_(fy),
+                dir_yaw_rad_(dir_yaw_rad), dir_pitch_rad_(dir_pitch_rad), yaw_offset_rad_(yaw_offset_rad) {
+            }
+
+            template <typename T>
+            bool operator()(const T *const shared_yaw_rad, const T *const distance_m, T *residual) const {
+                const Eigen::Matrix<T, 3, 1> xyz_gimbal = xyzFromYpd(T(dir_yaw_rad_), T(dir_pitch_rad_), distance_m[0]);
+                const Eigen::Matrix<T, 3, 1> p_camera =
+                    projectArmorPointToCamera(point_3d_, xyz_gimbal, shared_yaw_rad[0] + T(yaw_offset_rad_));
+
+                const T x_pred = p_camera.x() / p_camera.z();
+                const T y_pred = p_camera.y() / p_camera.z();
+                residual[0] = T(fx_) * (x_pred - T(observed_normalized_.x));
+                residual[1] = T(fy_) * (y_pred - T(observed_normalized_.y));
+                return true;
+            }
+
+            cv::Point3d point_3d_;
+            cv::Point2d observed_normalized_;
+            double fx_ = 0.0;
+            double fy_ = 0.0;
+            double dir_yaw_rad_ = 0.0;
+            double dir_pitch_rad_ = 0.0;
+            double yaw_offset_rad_ = 0.0;
         };
 
         Pose4DofCostEvaluation invalidEvaluation(const std::string &status) {
@@ -239,6 +309,44 @@ namespace armor_detector::pose {
                                              observation.fx,
                                              observation.fy,
                                              parameterization));
+    }
+
+    ceres::CostFunction *createPose4DofDistanceReprojectionCostFunction(const Pose4DofObservation &observation,
+                                                                        std::size_t corner_index,
+                                                                        double dir_yaw_rad,
+                                                                        double dir_pitch_rad,
+                                                                        double pose_yaw_rad) {
+        if (!observation.valid || corner_index >= observation.object_points.size() || !std::isfinite(dir_yaw_rad) ||
+            !std::isfinite(dir_pitch_rad) || !std::isfinite(pose_yaw_rad)) {
+            return nullptr;
+        }
+        return new ceres::AutoDiffCostFunction<Pose4DofDistanceReprojectionResidual, 2, 1>(
+            new Pose4DofDistanceReprojectionResidual(observation.object_points[corner_index],
+                                                     observation.observed_normalized[corner_index],
+                                                     observation.fx,
+                                                     observation.fy,
+                                                     dir_yaw_rad,
+                                                     dir_pitch_rad,
+                                                     pose_yaw_rad));
+    }
+
+    ceres::CostFunction *createPose4DofSharedYawDistanceReprojectionCostFunction(const Pose4DofObservation &observation,
+                                                                                 std::size_t corner_index,
+                                                                                 double dir_yaw_rad,
+                                                                                 double dir_pitch_rad,
+                                                                                 double yaw_offset_rad) {
+        if (!observation.valid || corner_index >= observation.object_points.size() || !std::isfinite(dir_yaw_rad) ||
+            !std::isfinite(dir_pitch_rad) || !std::isfinite(yaw_offset_rad)) {
+            return nullptr;
+        }
+        return new ceres::AutoDiffCostFunction<Pose4DofSharedYawDistanceReprojectionResidual, 2, 1, 1>(
+            new Pose4DofSharedYawDistanceReprojectionResidual(observation.object_points[corner_index],
+                                                              observation.observed_normalized[corner_index],
+                                                              observation.fx,
+                                                              observation.fy,
+                                                              dir_yaw_rad,
+                                                              dir_pitch_rad,
+                                                              yaw_offset_rad));
     }
 
 } // namespace armor_detector::pose

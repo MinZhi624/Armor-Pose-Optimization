@@ -1,12 +1,12 @@
 #pragma once
 
-#include "armor_detector/pose/IPoseRefiner.hpp"
+#include "armor_detector/pose/IndependentPoseRefiner.hpp"
 
 namespace armor_detector::pose {
 
-    class YawSearchRefiner : public IPoseRefiner {
-    public:
-        PoseRefineOutput refine(const PoseRefineInput &input) const override;
+    class YawSearchRefiner : public IndependentPoseRefiner {
+    protected:
+        PoseRefineOutput refineOne(const PoseRefineInput &input) const override;
     };
 
 } // namespace armor_detector::pose

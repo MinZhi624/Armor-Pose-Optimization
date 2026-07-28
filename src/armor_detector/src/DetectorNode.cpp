@@ -118,10 +118,13 @@ namespace armor_detector {
         LightBarColor target_color = (target_color_str == "RED") ? LightBarColor::RED : LightBarColor::BLUE;
 
         // --- PoseSolver ---
-        const auto refine_method_name = this->declare_parameter<std::string>("pose.refine_method", "pose_only_ba_4dof");
-        const auto refine_method = pose::poseRefineMethodFromString(refine_method_name);
-        pose_refiner_.setMethod(refine_method);
-        RCLCPP_INFO(this->get_logger(), "位姿估计方法: %s", pose::toString(refine_method).c_str());
+        const auto single_refine_method_name =
+            this->declare_parameter<std::string>("pose.single_refine_method", "yaw_search_then_distance");
+        const auto dual_refine_method_name =
+            this->declare_parameter<std::string>("pose.dual_refine_method", "dual_armor_ba_3dof_ypd");
+        pose_refiner_.setSingleMethod(pose::singlePoseRefineMethodFromString(single_refine_method_name));
+        pose_refiner_.setDualMethod(pose::dualPoseRefineMethodFromString(dual_refine_method_name));
+        RCLCPP_INFO(this->get_logger(), "位姿估计方法: %s", pose_refiner_.methodName().c_str());
 
         PoseSolver::PosePerturbationParams perturbation_params;
         perturbation_params.enabled = debug_config_.pose_perturb_enabled;

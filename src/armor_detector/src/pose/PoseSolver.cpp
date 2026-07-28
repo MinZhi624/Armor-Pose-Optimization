@@ -85,6 +85,22 @@ namespace armor_detector {
         std::unordered_map<int, std::vector<LastArmorYawRecord>> new_record;
         std::vector<SolvedArmor> solved_armors;
         solved_armors.reserve(armors.size());
+
+        struct PendingPoseRecord {
+            DetectedArmor classified;
+            SolvedArmor solved;
+            ArmorPose initial_pose;
+            cv::Point2f target_center;
+            int armor_name_key = 0;
+            cv::Vec3d initial_rvec;
+            cv::Vec3d initial_tvec;
+            pose::PoseRefineInput refine_input;
+            double initial_error = 0.0;
+            double reprojection_point_count = 0.0;
+        };
+
+        std::vector<PendingPoseRecord> pending_records;
+        pending_records.reserve(armors.size());
         for (std::size_t i = 0; i < armors.size(); ++i) {
             auto pnp_start = std::chrono::steady_clock::now();
             const auto &classified = armors[i];
@@ -116,150 +132,184 @@ namespace armor_detector {
             auto pnp_end = std::chrono::steady_clock::now();
             pnp_elapsed_ms += std::chrono::duration<double, std::milli>(pnp_end - pnp_start).count();
 
-            // Refine pose
+            PendingPoseRecord pending;
+            pending.classified = classified;
+            pending.solved = std::move(solved);
+            pending.initial_pose = initial_pose;
+            pending.target_center = target_center;
+            pending.armor_name_key = armor_name_key;
+            pending.initial_rvec = best_candidate.rvec;
+            pending.initial_tvec = best_candidate.tvec;
+            pending_records.push_back(std::move(pending));
+        }
+
+        if (!pending_records.empty()) {
             auto refine_start = std::chrono::steady_clock::now();
-            pose::PoseRefineInput refine_input;
-            refine_input.image_corners = solved.geometry.corners;
-            refine_input.initial_rvec = best_candidate.rvec;
-            refine_input.initial_tvec = best_candidate.tvec;
-            refine_input.armor_type = classified.geometry.type;
-            refine_input.camera_matrix = camera_matrix_;
-            refine_input.distortion_coefficients = distortion_coefficients_;
-
-            const std::size_t armor_index = solved_armors.size();
-            if (pose_landscape_analyzer_.params().enabled) {
-                pose::PoseLandscapeSampleInfo sample_info;
-                sample_info.armor_index = armor_index;
-                sample_info.armor_name = static_cast<int>(classified.classification.name);
-                if (classified.geometry.type == ArmorType::LARGE) {
-                    sample_info.armor_type = "large";
-                }
-                else if (classified.geometry.type == ArmorType::SMALL) {
-                    sample_info.armor_type = "small";
-                }
-                else {
-                    sample_info.armor_type = "none";
-                }
-                sample_info.confidence = classified.classification.confidence;
-                pose_debug_.landscape_samples.push_back(pose_landscape_analyzer_.analyze(refine_input, sample_info));
+            std::vector<pose::PoseRefineInput> refine_inputs;
+            refine_inputs.reserve(pending_records.size());
+            for (std::size_t armor_index = 0; armor_index < pending_records.size(); ++armor_index) {
+                auto &pending = pending_records[armor_index];
+                pending.refine_input.image_corners = pending.solved.geometry.corners;
+                pending.refine_input.initial_rvec = pending.initial_rvec;
+                pending.refine_input.initial_tvec = pending.initial_tvec;
+                pending.refine_input.armor_type = pending.classified.geometry.type;
+                pending.refine_input.armor_name = pending.classified.classification.name;
+                pending.refine_input.camera_matrix = camera_matrix_;
+                pending.refine_input.distortion_coefficients = distortion_coefficients_;
+                refine_inputs.push_back(pending.refine_input);
             }
 
-            const double initial_error = pose_refiner.calculateInitialError(refine_input);
-            const double reprojection_point_count = static_cast<double>(refine_input.image_corners.size());
-            const auto refine_output = pose_refiner.refine(refine_input);
-            if (refine_output.success) {
-                solved = createSolvedArmorFromRvecTvec(classified, refine_output.rvec, refine_output.tvec);
-            }
-            const ArmorPose &final_pose = solved.pose;
+            for (std::size_t armor_index = 0; armor_index < pending_records.size(); ++armor_index) {
+                auto &pending = pending_records[armor_index];
 
-            // Fill debug record with full fields
-            debug::PoseRefineDebugRecord rec;
-            rec.armor_index = armor_index;
-            rec.armor_name = static_cast<int>(classified.classification.name);
-            rec.armor_type = (classified.geometry.type == ArmorType::LARGE) ? "large"
-                : (classified.geometry.type == ArmorType::SMALL)            ? "small"
-                                                                            : "none";
-            rec.confidence = classified.classification.confidence;
-            rec.center_x_px = target_center.x;
-            rec.center_y_px = target_center.y;
-            rec.method = pose_refiner.methodName();
-            rec.success = refine_output.success;
-            rec.initial_xyz_gimbal = initial_pose.xyz_gimbal;
-            rec.final_xyz_gimbal = final_pose.xyz_gimbal;
-            rec.delta_xyz_gimbal = final_pose.xyz_gimbal - initial_pose.xyz_gimbal;
-            rec.initial_dir_yaw_rad = initial_pose.ypd_gimbal.x();
-            rec.final_dir_yaw_rad = final_pose.ypd_gimbal.x();
-            rec.delta_dir_yaw_rad = normalizeRadAngle(rec.final_dir_yaw_rad - rec.initial_dir_yaw_rad);
-            rec.initial_dir_pitch_rad = initial_pose.ypd_gimbal.y();
-            rec.final_dir_pitch_rad = final_pose.ypd_gimbal.y();
-            rec.delta_dir_pitch_rad = rec.final_dir_pitch_rad - rec.initial_dir_pitch_rad;
-            rec.initial_distance_m = initial_pose.ypd_gimbal.z();
-            rec.final_distance_m = final_pose.ypd_gimbal.z();
-            rec.delta_distance_m = rec.final_distance_m - rec.initial_distance_m;
-            rec.initial_yaw_rad = initial_pose.ypr_gimbal.x();
-            rec.final_yaw_rad = final_pose.ypr_gimbal.x();
-            rec.delta_yaw_rad = normalizeRadAngle(rec.final_yaw_rad - rec.initial_yaw_rad);
-            rec.initial_reprojection_error_px = initial_error;
-            rec.final_reprojection_error_px = refine_output.reprojection_error_px;
-            rec.delta_reprojection_error_px = initial_error - refine_output.reprojection_error_px;
-            rec.initial_reproj_sum_px = initial_error;
-            rec.final_reproj_sum_px = refine_output.reprojection_error_px;
-            rec.delta_reproj_sum_px = rec.final_reproj_sum_px - rec.initial_reproj_sum_px;
-            rec.initial_reproj_mean_px = rec.initial_reproj_sum_px / reprojection_point_count;
-            rec.final_reproj_mean_px = rec.final_reproj_sum_px / reprojection_point_count;
-            rec.delta_reproj_mean_px = rec.final_reproj_mean_px - rec.initial_reproj_mean_px;
-            const pose::Pose4DofObservation ba_model_observation = pose::createPose4DofObservation(refine_input);
-            rec.ba_model_initial_reproj_mean_px =
-                calculate4DofModelMeanError(ba_model_observation, initial_pose.xyz_gimbal, initial_pose.ypr_gimbal.x());
-            rec.ba_model_final_reproj_mean_px =
-                calculate4DofModelMeanError(ba_model_observation, final_pose.xyz_gimbal, final_pose.ypr_gimbal.x());
-            rec.has_solver_summary = refine_output.solver_summary.available;
-            rec.initial_cost = refine_output.solver_summary.initial_cost;
-            rec.final_cost = refine_output.solver_summary.final_cost;
-            rec.delta_cost = rec.final_cost - rec.initial_cost;
-            rec.num_iterations = refine_output.solver_summary.num_iterations;
-            rec.termination_type = refine_output.solver_summary.termination_type;
-            if (refine_output.success) {
-                const auto projected_corners = pose::projectArmor(classified.geometry.type,
-                                                                  refine_output.rvec,
-                                                                  refine_output.tvec,
-                                                                  camera_matrix_,
-                                                                  distortion_coefficients_);
-                rec.has_projected_corners = copyProjectedCorners(projected_corners, rec.projected_corners);
-
-                if (rec.has_projected_corners && pose_perturbation_params_.enabled) {
-                    const auto projectDirectionPerturbation = [&](const Eigen::Vector3d &ypd_gimbal,
-                                                                  std::array<cv::Point2f, 4> &corners) {
-                        const Eigen::Vector3d xyz_camera = tools::R_CAMERA_GIMBAL * tools::calculateXYZ(ypd_gimbal);
-                        const cv::Vec3d tvec_camera(xyz_camera.x(), xyz_camera.y(), xyz_camera.z());
-                        return copyProjectedCorners(pose::projectArmor(classified.geometry.type,
-                                                                       refine_output.rvec,
-                                                                       tvec_camera,
-                                                                       camera_matrix_,
-                                                                       distortion_coefficients_),
-                                                    corners);
-                    };
-
-                    const Eigen::Vector3d final_ypd_gimbal = final_pose.ypd_gimbal;
-                    auto dir_yaw_ypd = final_ypd_gimbal;
-                    dir_yaw_ypd.x() += pose_perturbation_params_.dir_yaw_delta_rad;
-                    auto dir_pitch_ypd = final_ypd_gimbal;
-                    dir_pitch_ypd.y() += pose_perturbation_params_.dir_pitch_delta_rad;
-                    auto distance_ypd = final_ypd_gimbal;
-                    distance_ypd.z() += pose_perturbation_params_.distance_delta_m;
-
-                    auto &perturbed = rec.perturbation_projected_corners;
-                    const bool direction_corners_available =
-                        projectDirectionPerturbation(dir_yaw_ypd, perturbed.dir_yaw_corners) &&
-                        projectDirectionPerturbation(dir_pitch_ypd, perturbed.dir_pitch_corners) &&
-                        projectDirectionPerturbation(distance_ypd, perturbed.distance_corners);
-
-                    const Eigen::Matrix3d r_gimbal_armor =
-                        tools::R_GIMBAL_CAMERA * pose::rotationMatrixFromRvec(refine_output.rvec);
-                    const Eigen::Matrix3d r_pose_yaw =
-                        Eigen::AngleAxisd(pose_perturbation_params_.pose_yaw_delta_rad, Eigen::Vector3d::UnitZ())
-                            .toRotationMatrix();
-                    const Eigen::Matrix3d r_camera_armor = tools::R_CAMERA_GIMBAL * r_pose_yaw * r_gimbal_armor;
-                    cv::Mat r_camera_armor_cv;
-                    cv::eigen2cv(r_camera_armor, r_camera_armor_cv);
-                    cv::Vec3d pose_yaw_rvec;
-                    cv::Rodrigues(r_camera_armor_cv, pose_yaw_rvec);
-                    const bool pose_yaw_corners_available =
-                        copyProjectedCorners(pose::projectArmor(classified.geometry.type,
-                                                                pose_yaw_rvec,
-                                                                refine_output.tvec,
-                                                                camera_matrix_,
-                                                                distortion_coefficients_),
-                                             perturbed.pose_yaw_corners);
-                    perturbed.available = direction_corners_available && pose_yaw_corners_available;
+                if (pose_landscape_analyzer_.params().enabled) {
+                    pose::PoseLandscapeSampleInfo sample_info;
+                    sample_info.armor_index = armor_index;
+                    sample_info.armor_name = static_cast<int>(pending.classified.classification.name);
+                    if (pending.classified.geometry.type == ArmorType::LARGE) {
+                        sample_info.armor_type = "large";
+                    }
+                    else if (pending.classified.geometry.type == ArmorType::SMALL) {
+                        sample_info.armor_type = "small";
+                    }
+                    else {
+                        sample_info.armor_type = "none";
+                    }
+                    sample_info.confidence = pending.classified.classification.confidence;
+                    pose_debug_.landscape_samples.push_back(
+                        pose_landscape_analyzer_.analyze(pending.refine_input, sample_info));
                 }
+                pending.initial_error = pose_refiner.calculateInitialError(pending.refine_input);
+                pending.reprojection_point_count = static_cast<double>(pending.refine_input.image_corners.size());
             }
-            pose_debug_.refine_records.push_back(rec);
+
+            const auto refine_batch_output = pose_refiner.refine(refine_inputs);
+            const pose::PoseRefineOutput missing_refine_output;
+            for (std::size_t armor_index = 0; armor_index < pending_records.size(); ++armor_index) {
+                auto &pending = pending_records[armor_index];
+                const auto &refine_output = (armor_index < refine_batch_output.items.size())
+                    ? refine_batch_output.items[armor_index]
+                    : missing_refine_output;
+                if (refine_output.success) {
+                    pending.solved =
+                        createSolvedArmorFromRvecTvec(pending.classified, refine_output.rvec, refine_output.tvec);
+                }
+                const ArmorPose &final_pose = pending.solved.pose;
+
+                // Fill debug record with full fields
+                debug::PoseRefineDebugRecord rec;
+                rec.armor_index = armor_index;
+                rec.armor_name = static_cast<int>(pending.classified.classification.name);
+                rec.armor_type = (pending.classified.geometry.type == ArmorType::LARGE) ? "large"
+                    : (pending.classified.geometry.type == ArmorType::SMALL)            ? "small"
+                                                                                        : "none";
+                rec.confidence = pending.classified.classification.confidence;
+                rec.center_x_px = pending.target_center.x;
+                rec.center_y_px = pending.target_center.y;
+                rec.method = pose_refiner.methodName();
+                rec.success = refine_output.success;
+                rec.initial_xyz_gimbal = pending.initial_pose.xyz_gimbal;
+                rec.final_xyz_gimbal = final_pose.xyz_gimbal;
+                rec.delta_xyz_gimbal = final_pose.xyz_gimbal - pending.initial_pose.xyz_gimbal;
+                rec.initial_dir_yaw_rad = pending.initial_pose.ypd_gimbal.x();
+                rec.final_dir_yaw_rad = final_pose.ypd_gimbal.x();
+                rec.delta_dir_yaw_rad = normalizeRadAngle(rec.final_dir_yaw_rad - rec.initial_dir_yaw_rad);
+                rec.initial_dir_pitch_rad = pending.initial_pose.ypd_gimbal.y();
+                rec.final_dir_pitch_rad = final_pose.ypd_gimbal.y();
+                rec.delta_dir_pitch_rad = rec.final_dir_pitch_rad - rec.initial_dir_pitch_rad;
+                rec.initial_distance_m = pending.initial_pose.ypd_gimbal.z();
+                rec.final_distance_m = final_pose.ypd_gimbal.z();
+                rec.delta_distance_m = rec.final_distance_m - pending.initial_pose.ypd_gimbal.z();
+                rec.initial_yaw_rad = pending.initial_pose.ypr_gimbal.x();
+                rec.final_yaw_rad = final_pose.ypr_gimbal.x();
+                rec.delta_yaw_rad = normalizeRadAngle(rec.final_yaw_rad - rec.initial_yaw_rad);
+                rec.initial_reprojection_error_px = pending.initial_error;
+                rec.final_reprojection_error_px = refine_output.reprojection_error_px;
+                rec.delta_reprojection_error_px = pending.initial_error - refine_output.reprojection_error_px;
+                rec.initial_reproj_sum_px = pending.initial_error;
+                rec.final_reproj_sum_px = refine_output.reprojection_error_px;
+                rec.delta_reproj_sum_px = rec.final_reproj_sum_px - rec.initial_reproj_sum_px;
+                rec.initial_reproj_mean_px = rec.initial_reproj_sum_px / pending.reprojection_point_count;
+                rec.final_reproj_mean_px = rec.final_reproj_sum_px / pending.reprojection_point_count;
+                rec.delta_reproj_mean_px = rec.final_reproj_mean_px - rec.initial_reproj_mean_px;
+                const pose::Pose4DofObservation ba_model_observation =
+                    pose::createPose4DofObservation(pending.refine_input);
+                rec.ba_model_initial_reproj_mean_px = calculate4DofModelMeanError(
+                    ba_model_observation, pending.initial_pose.xyz_gimbal, pending.initial_pose.ypr_gimbal.x());
+                rec.ba_model_final_reproj_mean_px =
+                    calculate4DofModelMeanError(ba_model_observation, final_pose.xyz_gimbal, final_pose.ypr_gimbal.x());
+                rec.has_solver_summary = refine_output.solver_summary.available;
+                rec.initial_cost = refine_output.solver_summary.initial_cost;
+                rec.final_cost = refine_output.solver_summary.final_cost;
+                rec.delta_cost = rec.final_cost - rec.initial_cost;
+                rec.num_iterations = refine_output.solver_summary.num_iterations;
+                rec.termination_type = refine_output.solver_summary.termination_type;
+                if (refine_output.success) {
+                    const auto projected_corners = pose::projectArmor(pending.classified.geometry.type,
+                                                                      refine_output.rvec,
+                                                                      refine_output.tvec,
+                                                                      camera_matrix_,
+                                                                      distortion_coefficients_);
+                    rec.has_projected_corners = copyProjectedCorners(projected_corners, rec.projected_corners);
+
+                    if (rec.has_projected_corners && pose_perturbation_params_.enabled) {
+                        const auto projectDirectionPerturbation = [&](const Eigen::Vector3d &ypd_gimbal,
+                                                                      std::array<cv::Point2f, 4> &corners) {
+                            const Eigen::Vector3d xyz_camera = tools::R_CAMERA_GIMBAL * tools::calculateXYZ(ypd_gimbal);
+                            const cv::Vec3d tvec_camera(xyz_camera.x(), xyz_camera.y(), xyz_camera.z());
+                            return copyProjectedCorners(pose::projectArmor(pending.classified.geometry.type,
+                                                                           refine_output.rvec,
+                                                                           tvec_camera,
+                                                                           camera_matrix_,
+                                                                           distortion_coefficients_),
+                                                        corners);
+                        };
+
+                        const Eigen::Vector3d final_ypd_gimbal = final_pose.ypd_gimbal;
+                        auto dir_yaw_ypd = final_ypd_gimbal;
+                        dir_yaw_ypd.x() += pose_perturbation_params_.dir_yaw_delta_rad;
+                        auto dir_pitch_ypd = final_ypd_gimbal;
+                        dir_pitch_ypd.y() += pose_perturbation_params_.dir_pitch_delta_rad;
+                        auto distance_ypd = final_ypd_gimbal;
+                        distance_ypd.z() += pose_perturbation_params_.distance_delta_m;
+
+                        auto &perturbed = rec.perturbation_projected_corners;
+                        const bool direction_corners_available =
+                            projectDirectionPerturbation(dir_yaw_ypd, perturbed.dir_yaw_corners) &&
+                            projectDirectionPerturbation(dir_pitch_ypd, perturbed.dir_pitch_corners) &&
+                            projectDirectionPerturbation(distance_ypd, perturbed.distance_corners);
+
+                        const Eigen::Matrix3d r_gimbal_armor =
+                            tools::R_GIMBAL_CAMERA * pose::rotationMatrixFromRvec(refine_output.rvec);
+                        const Eigen::Matrix3d r_pose_yaw =
+                            Eigen::AngleAxisd(pose_perturbation_params_.pose_yaw_delta_rad, Eigen::Vector3d::UnitZ())
+                                .toRotationMatrix();
+                        const Eigen::Matrix3d r_camera_armor = tools::R_CAMERA_GIMBAL * r_pose_yaw * r_gimbal_armor;
+                        cv::Mat r_camera_armor_cv;
+                        cv::eigen2cv(r_camera_armor, r_camera_armor_cv);
+                        cv::Vec3d pose_yaw_rvec;
+                        cv::Rodrigues(r_camera_armor_cv, pose_yaw_rvec);
+                        const bool pose_yaw_corners_available =
+                            copyProjectedCorners(pose::projectArmor(pending.classified.geometry.type,
+                                                                    pose_yaw_rvec,
+                                                                    refine_output.tvec,
+                                                                    camera_matrix_,
+                                                                    distortion_coefficients_),
+                                                 perturbed.pose_yaw_corners);
+                        perturbed.available = direction_corners_available && pose_yaw_corners_available;
+                    }
+                }
+                pose_debug_.refine_records.push_back(rec);
+            }
 
             auto refine_end = std::chrono::steady_clock::now();
             refine_elapsed_ms += std::chrono::duration<double, std::milli>(refine_end - refine_start).count();
-            new_record[armor_name_key].push_back({solved.pose.ypr_gimbal.x(), target_center});
-            solved_armors.push_back(std::move(solved));
+            for (std::size_t armor_index = 0; armor_index < pending_records.size(); ++armor_index) {
+                auto &pending = pending_records[armor_index];
+                new_record[pending.armor_name_key].push_back(
+                    {pending.solved.pose.ypr_gimbal.x(), pending.target_center});
+                solved_armors.push_back(std::move(pending.solved));
+            }
         }
         // 记录
         record_ = std::move(new_record);

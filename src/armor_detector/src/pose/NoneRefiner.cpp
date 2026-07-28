@@ -3,7 +3,7 @@
 
 namespace armor_detector::pose {
 
-    PoseRefineOutput NoneRefiner::refine(const PoseRefineInput &input) const {
+    PoseRefineOutput NoneRefiner::refineOne(const PoseRefineInput &input) const {
         PoseRefineOutput output;
         output.rvec = input.initial_rvec;
         output.tvec = input.initial_tvec;

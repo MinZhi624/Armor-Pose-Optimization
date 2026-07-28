@@ -63,7 +63,7 @@ namespace armor_detector::pose {
         }
     } // namespace
 
-    PoseRefineOutput PoseOnlyBa6DofRefiner::refine(const PoseRefineInput &input) const {
+    PoseRefineOutput PoseOnlyBa6DofRefiner::refineOne(const PoseRefineInput &input) const {
         PoseRefineOutput output;
         output.rvec = input.initial_rvec;
         output.tvec = input.initial_tvec;

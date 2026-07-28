@@ -4,7 +4,7 @@
 
 namespace armor_detector::pose {
 
-    class PoseOnlyBa4DofXYZRefiner : public IndependentPoseRefiner {
+    class YawSearchThenDistanceRefiner : public IndependentPoseRefiner {
     protected:
         PoseRefineOutput refineOne(const PoseRefineInput &input) const override;
     };

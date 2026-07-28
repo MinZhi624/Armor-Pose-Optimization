@@ -7,7 +7,7 @@ namespace armor_detector::pose {
     class IPoseRefiner {
     public:
         virtual ~IPoseRefiner() = default;
-        virtual PoseRefineOutput refine(const PoseRefineInput &input) const = 0;
+        virtual PoseRefineBatchOutput refine(const std::vector<PoseRefineInput> &inputs) const = 0;
     };
 
 } // namespace armor_detector::pose

@@ -6,9 +6,8 @@
 #include <limits>
 
 #include "armor_detector/pose/Pose4DofCostEvaluator.hpp"
-#include "armor_detector/pose/PoseOnlyBa4DofYPDRefiner.hpp"
 #include "armor_detector/pose/PoseProjection.hpp"
-#include "armor_detector/pose/YawSearchRefiner.hpp"
+#include "armor_detector/pose/PoseRefineRunner.hpp"
 #include "armor_detector/tools/angle.hpp"
 #include "armor_detector/tools/geometry.hpp"
 
@@ -247,8 +246,11 @@ namespace armor_detector::pose {
 
         auto &yaw_marker = sample.markers[1];
         const auto yaw_start = std::chrono::steady_clock::now();
-        const YawSearchRefiner yaw_search_refiner;
-        const PoseRefineOutput yaw_output = yaw_search_refiner.refine(input);
+        PoseRefineRunner yaw_runner;
+        yaw_runner.setSingleMethod(SinglePoseRefineMethod::YAW_SEARCH);
+        yaw_runner.setDualMethod(DualPoseRefineMethod::NONE);
+        const PoseRefineBatchOutput yaw_batch = yaw_runner.refine({input});
+        const PoseRefineOutput &yaw_output = yaw_batch.items[0];
         sample.yaw_search_elapsed_ms =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - yaw_start).count();
         sample.yaw_search_success = yaw_output.success;
@@ -279,8 +281,11 @@ namespace armor_detector::pose {
 
         auto &ba_marker = sample.markers[2];
         const auto ba_start = std::chrono::steady_clock::now();
-        const PoseOnlyBa4DofYPDRefiner ba_refiner;
-        const PoseRefineOutput ba_output = ba_refiner.refine(input);
+        PoseRefineRunner ba_runner;
+        ba_runner.setSingleMethod(SinglePoseRefineMethod::POSE_ONLY_BA_4DOF_YPD);
+        ba_runner.setDualMethod(DualPoseRefineMethod::NONE);
+        const PoseRefineBatchOutput ba_batch = ba_runner.refine({input});
+        const PoseRefineOutput &ba_output = ba_batch.items[0];
         sample.ba_elapsed_ms =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - ba_start).count();
         sample.ba_success = ba_output.success;

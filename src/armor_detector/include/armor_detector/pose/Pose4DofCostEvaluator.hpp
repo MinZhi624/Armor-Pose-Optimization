@@ -52,13 +52,32 @@ namespace armor_detector::pose {
                                                    const Eigen::Vector3d &ypd_gimbal,
                                                    double pose_yaw_rad);
 
-    /**
-     * @brief 创建与 evaluatePose4Dof* 使用同一投影公式的 Ceres residual。
-     *
-     * 返回值所有权交给 ceres::Problem；调用方仍负责为每个 block 创建 loss。
-     */
+    // Creates a Ceres residual with the same projection formula as evaluatePose4Dof*.
+    // ceres::Problem owns the returned cost; callers create the loss for each block.
     ceres::CostFunction *createPose4DofReprojectionCostFunction(const Pose4DofObservation &observation,
                                                                 std::size_t corner_index,
                                                                 Pose4DofParameterization parameterization);
+
+    /**
+     * @brief 创建固定角度的一维 distance Ceres residual。
+     *
+     * 唯一参数块为 distance（m）。
+     */
+    ceres::CostFunction *createPose4DofDistanceReprojectionCostFunction(const Pose4DofObservation &observation,
+                                                                        std::size_t corner_index,
+                                                                        double dir_yaw_rad,
+                                                                        double dir_pitch_rad,
+                                                                        double pose_yaw_rad);
+
+    /**
+     * @brief 创建共享 yaw、独立 distance 的双装甲板 reprojection residual。
+     *
+     * 参数块依次为 shared yaw 和 distance；方向 yaw、方向 pitch 以及 yaw offset 均为固定值。
+     */
+    ceres::CostFunction *createPose4DofSharedYawDistanceReprojectionCostFunction(const Pose4DofObservation &observation,
+                                                                                 std::size_t corner_index,
+                                                                                 double dir_yaw_rad,
+                                                                                 double dir_pitch_rad,
+                                                                                 double yaw_offset_rad);
 
 } // namespace armor_detector::pose

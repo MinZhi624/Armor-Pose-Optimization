@@ -54,7 +54,7 @@ namespace armor_detector::pose {
         }
     } // namespace
 
-    PoseRefineOutput YawSearchRefiner::refine(const PoseRefineInput &input) const {
+    PoseRefineOutput YawSearchRefiner::refineOne(const PoseRefineInput &input) const {
         PoseRefineOutput output;
         output.rvec = input.initial_rvec;
         output.tvec = input.initial_tvec;
