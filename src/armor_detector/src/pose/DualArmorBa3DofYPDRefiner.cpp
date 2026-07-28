@@ -63,6 +63,20 @@ namespace armor_detector::pose {
             return output;
         }
 
+        void setPairPnpFallback(const std::vector<PoseRefineInput> &inputs,
+                                std::size_t index_a,
+                                std::size_t index_b,
+                                PoseRefineBatchOutput &output,
+                                const PoseRefineSolverSummary *solver_summary = nullptr) {
+            output.items[index_a] = pnpOutput(inputs[index_a]);
+            output.items[index_b] = pnpOutput(inputs[index_b]);
+            if (solver_summary != nullptr) {
+                output.items[index_a].solver_summary = *solver_summary;
+                output.items[index_b].solver_summary = *solver_summary;
+            }
+            output.dual_summary.reset();
+        }
+
         void copyFallbackItems(const std::vector<PoseRefineInput> &inputs,
                                const std::vector<std::size_t> &indices,
                                const IPoseRefiner *fallback_refiner,
@@ -147,15 +161,15 @@ namespace armor_detector::pose {
             return ypd.allFinite();
         }
 
-        bool initializeSharedYaw(const ArmorPose &pose_a, const ArmorPose &pose_b, double &shared_yaw) {
+        bool initializeSharedYaw(const ArmorPose &pose_a, const ArmorPose &pose_b, double &shared_yaw_rad) {
             const double sin_sum = std::sin(pose_a.ypr_gimbal.x()) + std::sin(pose_b.ypr_gimbal.x() - kQuarterTurnRad);
             const double cos_sum = std::cos(pose_a.ypr_gimbal.x()) + std::cos(pose_b.ypr_gimbal.x() - kQuarterTurnRad);
             const double norm = std::hypot(sin_sum, cos_sum);
             if (!std::isfinite(norm) || norm <= kNearZeroDirection) {
                 return false;
             }
-            shared_yaw = tools::normalizeRadAngle(std::atan2(sin_sum, cos_sum));
-            return std::isfinite(shared_yaw);
+            shared_yaw_rad = tools::normalizeRadAngle(std::atan2(sin_sum, cos_sum));
+            return std::isfinite(shared_yaw_rad);
         }
 
         PoseRefineSolverSummary solverSummary(const ceres::Solver::Summary &summary) {
@@ -209,16 +223,14 @@ namespace armor_detector::pose {
         const Eigen::Vector3d fixed_ypd_b(tools::normalizeRadAngle(initial_pose_b.ypd_gimbal.x()),
                                           tools::normalizeRadAngle(initial_pose_b.ypd_gimbal.y()),
                                           initial_pose_b.ypd_gimbal.z());
-        double shared_yaw = 0.0;
+        double shared_yaw_rad = 0.0;
         if (!observation_a.valid || !observation_b.valid || !isFiniteYpd(fixed_ypd_a) || !isFiniteYpd(fixed_ypd_b) ||
-            !initializeSharedYaw(initial_pose_a, initial_pose_b, shared_yaw)) {
-            output.items[index_a] = pnpOutput(inputs[index_a]);
-            output.items[index_b] = pnpOutput(inputs[index_b]);
-            output.dual_summary.reset();
+            !initializeSharedYaw(initial_pose_a, initial_pose_b, shared_yaw_rad)) {
+            setPairPnpFallback(inputs, index_a, index_b, output);
         }
         else {
-            double distance_a = fixed_ypd_a.z();
-            double distance_b = fixed_ypd_b.z();
+            double distance_a_m = fixed_ypd_a.z();
+            double distance_b_m = fixed_ypd_b.z();
             ceres::Problem problem;
             bool costs_valid = true;
             for (std::size_t corner = 0; corner < 4; ++corner) {
@@ -233,15 +245,13 @@ namespace armor_detector::pose {
                     break;
                 }
                 problem.AddResidualBlock(
-                    cost_a, new ceres::HuberLoss(kPose4DofHuberLossScalePx), &shared_yaw, &distance_a);
+                    cost_a, new ceres::HuberLoss(kPose4DofHuberLossScalePx), &shared_yaw_rad, &distance_a_m);
                 problem.AddResidualBlock(
-                    cost_b, new ceres::HuberLoss(kPose4DofHuberLossScalePx), &shared_yaw, &distance_b);
+                    cost_b, new ceres::HuberLoss(kPose4DofHuberLossScalePx), &shared_yaw_rad, &distance_b_m);
             }
 
             if (!costs_valid) {
-                output.items[index_a] = pnpOutput(inputs[index_a]);
-                output.items[index_b] = pnpOutput(inputs[index_b]);
-                output.dual_summary.reset();
+                setPairPnpFallback(inputs, index_a, index_b, output);
             }
             else {
                 ceres::Solver::Options options;
@@ -253,31 +263,28 @@ namespace armor_detector::pose {
                 ceres::Solver::Summary summary;
                 ceres::Solve(options, &problem, &summary);
                 const PoseRefineSolverSummary pose_summary = solverSummary(summary);
-                const bool finite_solution = summary.IsSolutionUsable() && std::isfinite(shared_yaw) &&
-                    std::isfinite(distance_a) && std::isfinite(distance_b) && distance_a > 0.0 && distance_b > 0.0;
+                const bool finite_solution = summary.IsSolutionUsable() && std::isfinite(shared_yaw_rad) &&
+                    std::isfinite(distance_a_m) && std::isfinite(distance_b_m) && distance_a_m > 0.0 &&
+                    distance_b_m > 0.0;
 
                 if (!finite_solution) {
-                    output.items[index_a] = pnpOutput(inputs[index_a]);
-                    output.items[index_b] = pnpOutput(inputs[index_b]);
-                    output.items[index_a].solver_summary = pose_summary;
-                    output.items[index_b].solver_summary = pose_summary;
-                    output.dual_summary.reset();
+                    setPairPnpFallback(inputs, index_a, index_b, output, &pose_summary);
                 }
                 else {
-                    const double yaw_a = tools::normalizeRadAngle(shared_yaw);
-                    const double yaw_b = tools::normalizeRadAngle(shared_yaw + kQuarterTurnRad);
-                    const Eigen::Vector3d refined_ypd_a(fixed_ypd_a.x(), fixed_ypd_a.y(), distance_a);
-                    const Eigen::Vector3d refined_ypd_b(fixed_ypd_b.x(), fixed_ypd_b.y(), distance_b);
+                    const double yaw_a_rad = tools::normalizeRadAngle(shared_yaw_rad);
+                    const double yaw_b_rad = tools::normalizeRadAngle(shared_yaw_rad + kQuarterTurnRad);
+                    const Eigen::Vector3d refined_ypd_a(fixed_ypd_a.x(), fixed_ypd_a.y(), distance_a_m);
+                    const Eigen::Vector3d refined_ypd_b(fixed_ypd_b.x(), fixed_ypd_b.y(), distance_b_m);
                     cv::Vec3d refined_rvec_a;
                     cv::Vec3d refined_tvec_a;
                     cv::Vec3d refined_rvec_b;
                     cv::Vec3d refined_tvec_b;
-                    rvecTvecFromGimbalYpdYaw(refined_ypd_a, yaw_a, refined_rvec_a, refined_tvec_a);
-                    rvecTvecFromGimbalYpdYaw(refined_ypd_b, yaw_b, refined_rvec_b, refined_tvec_b);
+                    rvecTvecFromGimbalYpdYaw(refined_ypd_a, yaw_a_rad, refined_rvec_a, refined_tvec_a);
+                    rvecTvecFromGimbalYpdYaw(refined_ypd_b, yaw_b_rad, refined_rvec_b, refined_tvec_b);
                     const Pose4DofCostEvaluation evaluation_a =
-                        evaluatePose4DofYpdCost(observation_a, refined_ypd_a, yaw_a);
+                        evaluatePose4DofYpdCost(observation_a, refined_ypd_a, yaw_a_rad);
                     const Pose4DofCostEvaluation evaluation_b =
-                        evaluatePose4DofYpdCost(observation_b, refined_ypd_b, yaw_b);
+                        evaluatePose4DofYpdCost(observation_b, refined_ypd_b, yaw_b_rad);
                     const double reprojection_error_a =
                         calculateReprojectionError(inputs[index_a].armor_type,
                                                    inputs[index_a].image_corners,
@@ -297,11 +304,7 @@ namespace armor_detector::pose {
                         std::isfinite(reprojection_error_a) && std::isfinite(reprojection_error_b);
 
                     if (!valid_pair) {
-                        output.items[index_a] = pnpOutput(inputs[index_a]);
-                        output.items[index_b] = pnpOutput(inputs[index_b]);
-                        output.items[index_a].solver_summary = pose_summary;
-                        output.items[index_b].solver_summary = pose_summary;
-                        output.dual_summary.reset();
+                        setPairPnpFallback(inputs, index_a, index_b, output, &pose_summary);
                     }
                     else {
                         output.items[index_a].rvec = refined_rvec_a;
@@ -318,9 +321,9 @@ namespace armor_detector::pose {
                         DualArmorPoseRefineSummary dual_summary;
                         dual_summary.armor_a_index = index_a;
                         dual_summary.armor_b_index = index_b;
-                        dual_summary.shared_pose_yaw_rad = yaw_a;
-                        dual_summary.distance_a_m = distance_a;
-                        dual_summary.distance_b_m = distance_b;
+                        dual_summary.shared_pose_yaw_rad = yaw_a_rad;
+                        dual_summary.distance_a_m = distance_a_m;
+                        dual_summary.distance_b_m = distance_b_m;
                         dual_summary.armor_a_mean_reprojection_error_px = evaluation_a.mean_residual_px;
                         dual_summary.armor_b_mean_reprojection_error_px = evaluation_b.mean_residual_px;
                         dual_summary.mean_reprojection_error_px =
