@@ -21,7 +21,7 @@ namespace armor_detector::pose {
         POSE_ONLY_BA_4DOF_YPD,
     };
 
-    enum class DualPoseRefineMethod { NONE, DUAL_ARMOR_BA_3DOF_YPD };
+    enum class DualPoseRefineMethod { NONE, DUAL_ARMOR_BA_3DOF_YPD, DUAL_ARMOR_BA_7DOF_XYZ };
 
     struct PoseRefineInput {
         std::array<cv::Point2f, 4> image_corners;

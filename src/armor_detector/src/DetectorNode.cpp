@@ -121,7 +121,7 @@ namespace armor_detector {
         const auto single_refine_method_name =
             this->declare_parameter<std::string>("pose.single_refine_method", "yaw_search_then_distance");
         const auto dual_refine_method_name =
-            this->declare_parameter<std::string>("pose.dual_refine_method", "dual_armor_ba_3dof_ypd");
+            this->declare_parameter<std::string>("pose.dual_refine_method", "dual_armor_ba_7dof_xyz");
         pose_refiner_.setSingleMethod(pose::singlePoseRefineMethodFromString(single_refine_method_name));
         pose_refiner_.setDualMethod(pose::dualPoseRefineMethodFromString(dual_refine_method_name));
         RCLCPP_INFO(this->get_logger(), "位姿估计方法: %s", pose_refiner_.methodName().c_str());

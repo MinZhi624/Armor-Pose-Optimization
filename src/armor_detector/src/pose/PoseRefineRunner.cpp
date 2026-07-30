@@ -6,6 +6,7 @@ namespace armor_detector::pose {
     void PoseRefineRunner::setSingleMethod(SinglePoseRefineMethod method) {
         single_method_ = method;
         dual_armor_ba_3dof_ypd_refiner_.setFallbackRefiner(singleRefiner());
+        dual_armor_ba_7dof_xyz_refiner_.setFallbackRefiner(singleRefiner());
     }
 
     SinglePoseRefineMethod PoseRefineRunner::singleMethod() const {
@@ -15,6 +16,7 @@ namespace armor_detector::pose {
     void PoseRefineRunner::setDualMethod(DualPoseRefineMethod method) {
         dual_method_ = method;
         dual_armor_ba_3dof_ypd_refiner_.setFallbackRefiner(singleRefiner());
+        dual_armor_ba_7dof_xyz_refiner_.setFallbackRefiner(singleRefiner());
     }
 
     DualPoseRefineMethod PoseRefineRunner::dualMethod() const {
@@ -45,8 +47,13 @@ namespace armor_detector::pose {
     }
 
     PoseRefineBatchOutput PoseRefineRunner::refine(const std::vector<PoseRefineInput> &inputs) const {
-        if (dual_method_ == DualPoseRefineMethod::DUAL_ARMOR_BA_3DOF_YPD) {
-            return dual_armor_ba_3dof_ypd_refiner_.refine(inputs);
+        switch (dual_method_) {
+            case DualPoseRefineMethod::DUAL_ARMOR_BA_3DOF_YPD:
+                return dual_armor_ba_3dof_ypd_refiner_.refine(inputs);
+            case DualPoseRefineMethod::DUAL_ARMOR_BA_7DOF_XYZ:
+                return dual_armor_ba_7dof_xyz_refiner_.refine(inputs);
+            case DualPoseRefineMethod::NONE:
+                return singleRefiner().refine(inputs);
         }
         return singleRefiner().refine(inputs);
     }

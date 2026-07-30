@@ -1,4 +1,4 @@
-#include "armor_detector/pose/DualArmorBa3DofYPDRefiner.hpp"
+#include "armor_detector/pose/DualArmorBa7DofXYZRefiner.hpp"
 
 #include "DualArmorJointRefineCommon.hpp"
 #include "armor_detector/pose/Pose4DofCostEvaluator.hpp"
@@ -7,6 +7,7 @@
 
 #include <ceres/ceres.h>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -19,8 +20,8 @@ namespace armor_detector::pose {
             bool usable = false;
             double yaw_offset_rad = 0.0;
             double shared_yaw_rad = 0.0;
-            double distance_a_m = 0.0;
-            double distance_b_m = 0.0;
+            Eigen::Vector3d xyz_a = Eigen::Vector3d::Zero();
+            Eigen::Vector3d xyz_b = Eigen::Vector3d::Zero();
             cv::Vec3d rvec_a;
             cv::Vec3d tvec_a;
             cv::Vec3d rvec_b;
@@ -53,26 +54,23 @@ namespace armor_detector::pose {
                                  const PoseRefineInput &input_b,
                                  const Pose4DofObservation &observation_a,
                                  const Pose4DofObservation &observation_b,
-                                 const ArmorPose &initial_pose_a,
-                                 const ArmorPose &initial_pose_b,
+                                 const ArmorPose &pose_a,
+                                 const ArmorPose &pose_b,
                                  double yaw_offset_rad) {
             Candidate result;
             result.yaw_offset_rad = yaw_offset_rad;
-            const Eigen::Vector3d ypd_a = initial_pose_a.ypd_gimbal;
-            const Eigen::Vector3d ypd_b = initial_pose_b.ypd_gimbal;
-            if (!observation_a.valid || !observation_b.valid || !ypd_a.allFinite() || !ypd_b.allFinite() ||
-                !dual_armor_detail::initializeSharedYaw(
-                    initial_pose_a, initial_pose_b, yaw_offset_rad, result.shared_yaw_rad)) {
+            result.xyz_a = pose_a.xyz_gimbal;
+            result.xyz_b = pose_b.xyz_gimbal;
+            if (!observation_a.valid || !observation_b.valid || !result.xyz_a.allFinite() ||
+                !result.xyz_b.allFinite() ||
+                !dual_armor_detail::initializeSharedYaw(pose_a, pose_b, yaw_offset_rad, result.shared_yaw_rad)) {
                 return result;
             }
-            result.distance_a_m = ypd_a.z();
-            result.distance_b_m = ypd_b.z();
             ceres::Problem problem;
             for (std::size_t corner = 0; corner < 4; ++corner) {
-                auto *cost_a = createPose4DofSharedYawDistanceReprojectionCostFunction(
-                    observation_a, corner, ypd_a.x(), ypd_a.y(), 0.0);
-                auto *cost_b = createPose4DofSharedYawDistanceReprojectionCostFunction(
-                    observation_b, corner, ypd_b.x(), ypd_b.y(), yaw_offset_rad);
+                auto *cost_a = createPose4DofSharedYawXyzReprojectionCostFunction(observation_a, corner, 0.0);
+                auto *cost_b =
+                    createPose4DofSharedYawXyzReprojectionCostFunction(observation_b, corner, yaw_offset_rad);
                 if (cost_a == nullptr || cost_b == nullptr) {
                     delete cost_a;
                     delete cost_b;
@@ -81,11 +79,11 @@ namespace armor_detector::pose {
                 problem.AddResidualBlock(cost_a,
                                          new ceres::HuberLoss(kPose4DofHuberLossScalePx),
                                          &result.shared_yaw_rad,
-                                         &result.distance_a_m);
+                                         result.xyz_a.data());
                 problem.AddResidualBlock(cost_b,
                                          new ceres::HuberLoss(kPose4DofHuberLossScalePx),
                                          &result.shared_yaw_rad,
-                                         &result.distance_b_m);
+                                         result.xyz_b.data());
             }
             ceres::Solver::Options options;
             options.linear_solver_type = ceres::DENSE_QR;
@@ -95,21 +93,19 @@ namespace armor_detector::pose {
             ceres::Solve(options, &problem, &summary);
             result.solver_summary = solverSummary(summary);
             if (!summary.IsSolutionUsable() || !std::isfinite(summary.final_cost) ||
-                !std::isfinite(result.shared_yaw_rad) || !std::isfinite(result.distance_a_m) ||
-                !std::isfinite(result.distance_b_m) || result.distance_a_m <= 0.0 || result.distance_b_m <= 0.0) {
+                !std::isfinite(result.shared_yaw_rad) || !result.xyz_a.allFinite() || !result.xyz_b.allFinite() ||
+                result.xyz_a.norm() <= 0.0 || result.xyz_b.norm() <= 0.0) {
                 return result;
             }
             result.shared_yaw_rad = tools::normalizeRadAngle(result.shared_yaw_rad);
-            const Eigen::Vector3d refined_ypd_a(ypd_a.x(), ypd_a.y(), result.distance_a_m);
-            const Eigen::Vector3d refined_ypd_b(ypd_b.x(), ypd_b.y(), result.distance_b_m);
-            rvecTvecFromGimbalYpdYaw(refined_ypd_a, result.shared_yaw_rad, result.rvec_a, result.tvec_a);
-            rvecTvecFromGimbalYpdYaw(refined_ypd_b,
+            rvecTvecFromGimbalXyzYaw(result.xyz_a, result.shared_yaw_rad, result.rvec_a, result.tvec_a);
+            rvecTvecFromGimbalXyzYaw(result.xyz_b,
                                      tools::normalizeRadAngle(result.shared_yaw_rad + yaw_offset_rad),
                                      result.rvec_b,
                                      result.tvec_b);
-            result.evaluation_a = evaluatePose4DofYpdCost(observation_a, refined_ypd_a, result.shared_yaw_rad);
-            result.evaluation_b = evaluatePose4DofYpdCost(
-                observation_b, refined_ypd_b, tools::normalizeRadAngle(result.shared_yaw_rad + yaw_offset_rad));
+            result.evaluation_a = evaluatePose4DofCost(observation_a, result.xyz_a, result.shared_yaw_rad);
+            result.evaluation_b = evaluatePose4DofCost(
+                observation_b, result.xyz_b, tools::normalizeRadAngle(result.shared_yaw_rad + yaw_offset_rad));
             result.reprojection_error_a = calculateReprojectionError(input_a.armor_type,
                                                                      input_a.image_corners,
                                                                      result.rvec_a,
@@ -141,11 +137,11 @@ namespace armor_detector::pose {
         }
     } // namespace
 
-    void DualArmorBa3DofYPDRefiner::setFallbackRefiner(const IPoseRefiner &fallback_refiner) {
+    void DualArmorBa7DofXYZRefiner::setFallbackRefiner(const IPoseRefiner &fallback_refiner) {
         fallback_refiner_ = &fallback_refiner;
     }
 
-    PoseRefineBatchOutput DualArmorBa3DofYPDRefiner::refine(const std::vector<PoseRefineInput> &inputs) const {
+    PoseRefineBatchOutput DualArmorBa7DofXYZRefiner::refine(const std::vector<PoseRefineInput> &inputs) const {
         PoseRefineBatchOutput output;
         output.items.resize(inputs.size());
         dual_armor_detail::PairIndices pair;
@@ -195,8 +191,8 @@ namespace armor_detector::pose {
                 pair.armor_a_index,
                 pair.armor_b_index,
                 winner->shared_yaw_rad,
-                winner->distance_a_m,
-                winner->distance_b_m,
+                winner->xyz_a.norm(),
+                winner->xyz_b.norm(),
                 winner->evaluation_a.mean_residual_px,
                 winner->evaluation_b.mean_residual_px,
                 (winner->evaluation_a.mean_residual_px + winner->evaluation_b.mean_residual_px) / 2.0,

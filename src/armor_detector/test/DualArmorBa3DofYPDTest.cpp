@@ -162,6 +162,29 @@ namespace armor_detector::pose {
                     kPoseToleranceRad);
     }
 
+    TEST(DualArmorBa3DofYPD, SelectsNegativeQuarterTurn) {
+        constexpr double target_yaw_rad = -0.4;
+        const PoseRefineInput armor_a =
+            makeSyntheticArmor(ArmorName::ONE, 0.15, -0.05, 4.2, 4.8, target_yaw_rad + 0.12, target_yaw_rad);
+        const PoseRefineInput armor_b = makeSyntheticArmor(
+            ArmorName::ONE, -0.15, -0.05, 5.8, 5.2, target_yaw_rad - M_PI_2 - 0.12, target_yaw_rad - M_PI_2);
+        PoseRefineRunner runner = makeRunner(DualPoseRefineMethod::DUAL_ARMOR_BA_3DOF_YPD);
+
+        const PoseRefineBatchOutput output = runner.refine({armor_a, armor_b});
+
+        ASSERT_TRUE(output.dual_summary.has_value());
+        const ArmorPose final_pose_a = calculateArmorPose(
+            output.items[0].rvec, output.items[0].tvec, armor_a.image_corners, armor_a.camera_matrix);
+        const ArmorPose final_pose_b = calculateArmorPose(
+            output.items[1].rvec, output.items[1].tvec, armor_b.image_corners, armor_b.camera_matrix);
+        EXPECT_NEAR(tools::shortestAngularDistance(target_yaw_rad, output.dual_summary->shared_pose_yaw_rad),
+                    0.0,
+                    kPoseToleranceRad);
+        EXPECT_NEAR(tools::shortestAngularDistance(final_pose_a.ypr_gimbal.x(), final_pose_b.ypr_gimbal.x()),
+                    -M_PI_2,
+                    kHardConstraintToleranceRad);
+    }
+
     TEST(DualArmorBa3DofYPD, DelegatesWhenDualIsDisabledOrPairIsIneligible) {
         SyntheticPair pair = makeSyntheticPair();
         pair.armor_b.armor_name = ArmorName::TWO;

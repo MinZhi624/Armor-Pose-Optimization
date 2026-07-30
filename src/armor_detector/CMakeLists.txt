@@ -33,7 +33,9 @@ add_executable(armor_detector_node
   src/pose/PoseRefineData.cpp
   src/pose/PoseRefineRunner.cpp
   src/pose/IndependentPoseRefiner.cpp
+  src/pose/DualArmorJointRefineCommon.cpp
   src/pose/DualArmorBa3DofYPDRefiner.cpp
+  src/pose/DualArmorBa7DofXYZRefiner.cpp
   src/pose/NoneRefiner.cpp
   src/pose/YawSearchRefiner.cpp
   src/pose/YawSearchThenDistanceRefiner.cpp
@@ -109,7 +111,9 @@ if(BUILD_TESTING)
     src/pose/PoseRefineData.cpp
     src/pose/PoseRefineRunner.cpp
     src/pose/IndependentPoseRefiner.cpp
+    src/pose/DualArmorJointRefineCommon.cpp
     src/pose/DualArmorBa3DofYPDRefiner.cpp
+    src/pose/DualArmorBa7DofXYZRefiner.cpp
     src/pose/NoneRefiner.cpp
     src/pose/PoseOnlyBa6DofRefiner.cpp
     src/pose/PoseOnlyBa4DofXYZRefiner.cpp
@@ -133,7 +137,9 @@ if(BUILD_TESTING)
     src/pose/PoseRefineData.cpp
     src/pose/PoseRefineRunner.cpp
     src/pose/IndependentPoseRefiner.cpp
+    src/pose/DualArmorJointRefineCommon.cpp
     src/pose/DualArmorBa3DofYPDRefiner.cpp
+    src/pose/DualArmorBa7DofXYZRefiner.cpp
     src/pose/NoneRefiner.cpp
     src/pose/PoseOnlyBa6DofRefiner.cpp
     src/pose/PoseOnlyBa4DofXYZRefiner.cpp
@@ -148,6 +154,32 @@ if(BUILD_TESTING)
       ${EIGEN3_INCLUDE_DIRS}
     )
     target_link_libraries(dual_armor_ba_3dof_ypd_test ${OpenCV_LIBS} Eigen3::Eigen Ceres::ceres)
+  endif()
+
+  ament_add_gtest(dual_armor_ba_7dof_xyz_test
+    test/DualArmorBa7DofXYZTest.cpp
+    src/pose/Pose4DofCostEvaluator.cpp
+    src/pose/PoseProjection.cpp
+    src/pose/PoseRefineData.cpp
+    src/pose/PoseRefineRunner.cpp
+    src/pose/IndependentPoseRefiner.cpp
+    src/pose/DualArmorJointRefineCommon.cpp
+    src/pose/DualArmorBa3DofYPDRefiner.cpp
+    src/pose/DualArmorBa7DofXYZRefiner.cpp
+    src/pose/NoneRefiner.cpp
+    src/pose/PoseOnlyBa6DofRefiner.cpp
+    src/pose/PoseOnlyBa4DofXYZRefiner.cpp
+    src/pose/PoseOnlyBa4DofYPDRefiner.cpp
+    src/pose/YawSearchRefiner.cpp
+    src/pose/YawSearchThenDistanceRefiner.cpp
+  )
+  if(TARGET dual_armor_ba_7dof_xyz_test)
+    ament_target_dependencies(dual_armor_ba_7dof_xyz_test rclcpp)
+    target_include_directories(dual_armor_ba_7dof_xyz_test PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+      ${EIGEN3_INCLUDE_DIRS}
+    )
+    target_link_libraries(dual_armor_ba_7dof_xyz_test ${OpenCV_LIBS} Eigen3::Eigen Ceres::ceres)
   endif()
 
   ament_lint_auto_find_test_dependencies()

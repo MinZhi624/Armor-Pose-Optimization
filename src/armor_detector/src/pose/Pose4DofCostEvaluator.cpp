@@ -160,6 +160,33 @@ namespace armor_detector::pose {
             double yaw_offset_rad_ = 0.0;
         };
 
+        struct Pose4DofSharedYawXyzReprojectionResidual {
+            Pose4DofSharedYawXyzReprojectionResidual(const cv::Point3d &point_3d,
+                                                     const cv::Point2d &observed_normalized,
+                                                     double fx,
+                                                     double fy,
+                                                     double yaw_offset_rad) :
+                point_3d_(point_3d), observed_normalized_(observed_normalized), fx_(fx), fy_(fy),
+                yaw_offset_rad_(yaw_offset_rad) {
+            }
+
+            template <typename T>
+            bool operator()(const T *const shared_yaw_rad, const T *const xyz_gimbal, T *residual) const {
+                const Eigen::Matrix<T, 3, 1> xyz(xyz_gimbal[0], xyz_gimbal[1], xyz_gimbal[2]);
+                const Eigen::Matrix<T, 3, 1> p_camera =
+                    projectArmorPointToCamera(point_3d_, xyz, shared_yaw_rad[0] + T(yaw_offset_rad_));
+                residual[0] = T(fx_) * (p_camera.x() / p_camera.z() - T(observed_normalized_.x));
+                residual[1] = T(fy_) * (p_camera.y() / p_camera.z() - T(observed_normalized_.y));
+                return true;
+            }
+
+            cv::Point3d point_3d_;
+            cv::Point2d observed_normalized_;
+            double fx_ = 0.0;
+            double fy_ = 0.0;
+            double yaw_offset_rad_ = 0.0;
+        };
+
         Pose4DofCostEvaluation invalidEvaluation(const std::string &status) {
             Pose4DofCostEvaluation evaluation;
             evaluation.status = status;
@@ -347,6 +374,20 @@ namespace armor_detector::pose {
                                                               dir_yaw_rad,
                                                               dir_pitch_rad,
                                                               yaw_offset_rad));
+    }
+
+    ceres::CostFunction *createPose4DofSharedYawXyzReprojectionCostFunction(const Pose4DofObservation &observation,
+                                                                            std::size_t corner_index,
+                                                                            double yaw_offset_rad) {
+        if (!observation.valid || corner_index >= observation.object_points.size() || !std::isfinite(yaw_offset_rad)) {
+            return nullptr;
+        }
+        return new ceres::AutoDiffCostFunction<Pose4DofSharedYawXyzReprojectionResidual, 2, 1, 3>(
+            new Pose4DofSharedYawXyzReprojectionResidual(observation.object_points[corner_index],
+                                                         observation.observed_normalized[corner_index],
+                                                         observation.fx,
+                                                         observation.fy,
+                                                         yaw_offset_rad));
     }
 
 } // namespace armor_detector::pose

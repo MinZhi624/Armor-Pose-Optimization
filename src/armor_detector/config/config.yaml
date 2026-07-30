@@ -76,8 +76,8 @@ armor_detector_node_cpp:
       # "yaw_search_then_distance",
       # "none"
       single_refine_method: "yaw_search_then_distance"
-      # 双装甲板联合位姿矫正方法: "dual_armor_ba_3dof_ypd" 或 "none"
-      dual_refine_method: "dual_armor_ba_3dof_ypd"
+      # 双装甲板联合位姿矫正方法: "dual_armor_ba_7dof_xyz", "dual_armor_ba_3dof_ypd" 或 "none"
+      dual_refine_method: "dual_armor_ba_7dof_xyz"
     # ==================== Debug ====================
     debug:
       # OpenCV GUI 开关（false=无头模式，不显示窗口）``

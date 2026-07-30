@@ -1,6 +1,7 @@
 #pragma once
 
 #include "armor_detector/pose/DualArmorBa3DofYPDRefiner.hpp"
+#include "armor_detector/pose/DualArmorBa7DofXYZRefiner.hpp"
 #include "armor_detector/pose/IPoseRefiner.hpp"
 #include "armor_detector/pose/NoneRefiner.hpp"
 #include "armor_detector/pose/PoseOnlyBa4DofXYZRefiner.hpp"
@@ -39,6 +40,7 @@ namespace armor_detector::pose {
         PoseOnlyBa4DofXYZRefiner pose_only_ba_4dof_xyz_refiner_;
         PoseOnlyBa4DofYPDRefiner pose_only_ba_4dof_ypd_refiner_;
         DualArmorBa3DofYPDRefiner dual_armor_ba_3dof_ypd_refiner_;
+        DualArmorBa7DofXYZRefiner dual_armor_ba_7dof_xyz_refiner_;
     };
 
 } // namespace armor_detector::pose

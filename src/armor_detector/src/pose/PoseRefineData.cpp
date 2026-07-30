@@ -48,6 +48,8 @@ namespace armor_detector::pose {
                 return "none";
             case DualPoseRefineMethod::DUAL_ARMOR_BA_3DOF_YPD:
                 return "dual_armor_ba_3dof_ypd";
+            case DualPoseRefineMethod::DUAL_ARMOR_BA_7DOF_XYZ:
+                return "dual_armor_ba_7dof_xyz";
         }
         return "none";
     }
@@ -55,6 +57,9 @@ namespace armor_detector::pose {
     DualPoseRefineMethod dualPoseRefineMethodFromString(std::string_view name) {
         if (name == "dual_armor_ba_3dof_ypd") {
             return DualPoseRefineMethod::DUAL_ARMOR_BA_3DOF_YPD;
+        }
+        if (name == "dual_armor_ba_7dof_xyz") {
+            return DualPoseRefineMethod::DUAL_ARMOR_BA_7DOF_XYZ;
         }
         return DualPoseRefineMethod::NONE;
     }

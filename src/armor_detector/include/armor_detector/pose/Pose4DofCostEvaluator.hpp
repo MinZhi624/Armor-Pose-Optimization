@@ -80,4 +80,8 @@ namespace armor_detector::pose {
                                                                                  double dir_pitch_rad,
                                                                                  double yaw_offset_rad);
 
+    ceres::CostFunction *createPose4DofSharedYawXyzReprojectionCostFunction(const Pose4DofObservation &observation,
+                                                                            std::size_t corner_index,
+                                                                            double yaw_offset_rad);
+
 } // namespace armor_detector::pose
