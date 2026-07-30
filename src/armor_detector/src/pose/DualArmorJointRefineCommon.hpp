@@ -18,6 +18,7 @@ namespace armor_detector::pose::dual_armor_detail {
                              const ArmorPose &pose_b,
                              double yaw_offset_rad,
                              double &shared_yaw_rad);
+    bool selectPlusCandidate(bool plus_usable, double plus_cost, bool minus_usable, double minus_cost);
     PoseRefineOutput pnpOutput(const PoseRefineInput &input);
     void setPairPnpFallback(const std::vector<PoseRefineInput> &inputs,
                             const PairIndices &pair,

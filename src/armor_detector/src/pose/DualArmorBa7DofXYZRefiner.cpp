@@ -14,7 +14,6 @@
 namespace armor_detector::pose {
     namespace {
         constexpr double kQuarterTurnRad = M_PI / 2.0;
-        constexpr double kCostTieRelativeTolerance = 1e-12;
 
         struct Candidate {
             bool usable = false;
@@ -125,15 +124,13 @@ namespace armor_detector::pose {
         }
 
         const Candidate *selectCandidate(const Candidate &plus, const Candidate &minus) {
-            if (!plus.usable) {
-                return minus.usable ? &minus : nullptr;
+            if (!plus.usable && !minus.usable) {
+                return nullptr;
             }
-            if (!minus.usable) {
-                return &plus;
-            }
-            const double tolerance = kCostTieRelativeTolerance *
-                std::max({1.0, std::abs(plus.solver_summary.final_cost), std::abs(minus.solver_summary.final_cost)});
-            return minus.solver_summary.final_cost + tolerance < plus.solver_summary.final_cost ? &minus : &plus;
+            return dual_armor_detail::selectPlusCandidate(
+                       plus.usable, plus.solver_summary.final_cost, minus.usable, minus.solver_summary.final_cost)
+                ? &plus
+                : &minus;
         }
     } // namespace
 

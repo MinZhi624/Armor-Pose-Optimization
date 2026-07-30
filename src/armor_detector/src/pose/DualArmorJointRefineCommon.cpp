@@ -2,6 +2,7 @@
 
 #include "armor_detector/tools/angle.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -83,6 +84,18 @@ namespace armor_detector::pose::dual_armor_detail {
         }
         shared_yaw_rad = tools::normalizeRadAngle(std::atan2(sin_sum, cos_sum));
         return std::isfinite(shared_yaw_rad);
+    }
+
+    bool selectPlusCandidate(bool plus_usable, double plus_cost, bool minus_usable, double minus_cost) {
+        constexpr double kCostTieRelativeTolerance = 1e-12;
+        if (!plus_usable) {
+            return false;
+        }
+        if (!minus_usable) {
+            return true;
+        }
+        const double tolerance = kCostTieRelativeTolerance * std::max({1.0, std::abs(plus_cost), std::abs(minus_cost)});
+        return minus_cost + tolerance >= plus_cost;
     }
 
     PoseRefineOutput pnpOutput(const PoseRefineInput &input) {

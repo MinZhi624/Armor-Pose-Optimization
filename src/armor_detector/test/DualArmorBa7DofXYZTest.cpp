@@ -45,6 +45,12 @@ namespace armor_detector::pose {
             EXPECT_NEAR(pose.xyz_gimbal.y(), expected_xyz.y(), kXyzToleranceM);
             EXPECT_NEAR(pose.xyz_gimbal.z(), expected_xyz.z(), kXyzToleranceM);
         }
+
+        void expectPnp(const PoseRefineInput &input, const PoseRefineOutput &output) {
+            EXPECT_EQ(output.rvec, input.initial_rvec);
+            EXPECT_EQ(output.tvec, input.initial_tvec);
+            EXPECT_TRUE(output.success);
+        }
     } // namespace
 
     TEST(DualArmorBa7DofXYZ, RecoversIndependentGimbalTranslationsAndPositiveQuarterTurn) {
@@ -85,6 +91,38 @@ namespace armor_detector::pose {
         EXPECT_NEAR(
             tools::shortestAngularDistance(yaw, output.dual_summary->shared_pose_yaw_rad), 0.0, kPoseToleranceRad);
         EXPECT_NEAR(tools::shortestAngularDistance(final_a.ypr_gimbal.x(), final_b.ypr_gimbal.x()), -M_PI_2, 1e-9);
+    }
+
+    TEST(DualArmorBa7DofXYZ, UsesImagePositionWhenInputsAreReordered) {
+        constexpr double yaw = 0.2;
+        const auto armor_a = makeArmor(yaw, yaw + 0.1, {4.8, 0.6, 0.0}, {5.0, 0.4, 0.1});
+        const auto armor_b = makeArmor(yaw + M_PI_2, yaw + M_PI_2 - 0.1, {5.1, -0.7, 0.0}, {4.9, -0.5, 0.1});
+        const auto ordered = runner().refine({armor_a, armor_b});
+        const auto output = runner().refine({armor_b, armor_a});
+
+        ASSERT_TRUE(ordered.dual_summary.has_value());
+        ASSERT_TRUE(output.dual_summary.has_value());
+        EXPECT_EQ(output.dual_summary->armor_a_index, 1U);
+        EXPECT_EQ(output.dual_summary->armor_b_index, 0U);
+        EXPECT_NEAR(output.dual_summary->distance_a_m, ordered.dual_summary->distance_a_m, kXyzToleranceM);
+        EXPECT_NEAR(output.dual_summary->distance_b_m, ordered.dual_summary->distance_b_m, kXyzToleranceM);
+    }
+
+    TEST(DualArmorBa7DofXYZ, DelegatesIneligibleAndAtomicallyFallsBackToPnp) {
+        auto armor_a = makeArmor(0.2, 0.3, {4.8, 0.5, 0.0}, {5.0, 0.4, 0.1});
+        auto armor_b = makeArmor(0.2 + M_PI_2, 0.2 + M_PI_2 - 0.1, {5.1, -0.7, 0.0}, {4.9, -0.5, 0.1});
+        armor_b.armor_name = ArmorName::TWO;
+        const auto ineligible = runner().refine({armor_a, armor_b});
+        EXPECT_FALSE(ineligible.dual_summary.has_value());
+        expectPnp(armor_a, ineligible.items[0]);
+        expectPnp(armor_b, ineligible.items[1]);
+
+        armor_b.armor_name = ArmorName::ONE;
+        armor_a.camera_matrix(0, 0) = 0.0;
+        const auto fallback = runner().refine({armor_a, armor_b});
+        EXPECT_FALSE(fallback.dual_summary.has_value());
+        expectPnp(armor_a, fallback.items[0]);
+        expectPnp(armor_b, fallback.items[1]);
     }
 
     TEST(DualArmorBa7DofXYZ, RegistersMethodString) {
