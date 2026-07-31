@@ -1,6 +1,6 @@
 ---
 name: plan-execute-workflow
-description: 当任务已经有明确 Plan，需要由 Execute 保持主控并忠实实施，按需调用 Worker、Explore、Scout 和 Sync，最后统一审查与验证时使用。
+description: 当任务已经有明确 Plan，需要由 Execute 保持主控并忠实实施，按需调用 Worker、Explore、Scout 和 Review，最后统一审查与验证时使用。
 compatibility: opencode
 metadata:
   workflow: plan-execute
@@ -22,10 +22,11 @@ metadata:
 ```text
 Plan → Execute
           ├─ 自己执行
-          ├─ Worker：局部代码修改
+          ├─ worker-routine：D1-D2 局部代码修改
+          ├─ worker-expert：D3-D5 局部代码修改
           ├─ Explore：补充本地事实
           ├─ Scout：补充外部事实
-          └─ Sync：同步文档与配置说明
+          └─ Review：并行执行 Standards 与 Spec 审查
 ```
 
 Execute 始终保持主控权，并对最终实现、审查和验证负责。
@@ -54,12 +55,29 @@ Execute 根据实际任务自行划分和调整阶段。阶段只是执行地图
 
 ## 子 Agent 边界
 
-- Worker：只完成无需重新规划的局部代码修改。
+- `worker-routine`：只完成无需重新规划的 D1-D2 局部代码修改。
+- `worker-expert`：只完成无需重新规划、且已由 Execute 确定接口与语义的 D3-D5 局部代码修改。
 - Explore：只补充本地代码事实。
 - Scout：只补充外部文档、依赖和上游事实。
-- Sync：只同步被授权的文档、配置说明、示例或注册表。
+- Review：只读检查一个指定轴，不修改文件、不运行测试、不提交。
 
 子 Agent 不拥有整体任务，也不替 Execute 作最终决策。
+
+## Worker 任务合同
+
+Execute 委派 Worker 时必须提供以下字段：
+
+```text
+objective
+difficulty
+allowed_files
+forbidden_changes
+test_seam
+targeted_commands
+done_when
+```
+
+Worker 只能在 `allowed_files` 内工作。需要扩大范围、新设计、公共接口变化或改变核心语义时，必须返回 `BLOCKED`。Worker 不运行完整测试套件、不提交、不推送，也不调用其他 Agent。
 
 ## 审查与偏离
 
@@ -72,6 +90,6 @@ Execute 必须检查子 Agent 的实际修改，不能只依赖总结。
 
 ## 最终验证
 
-Worker 不负责测试。最终的 diff 审查、编译、测试、运行时检查、基准以及文档一致性验证均由 Execute 统一负责。
+Worker 可以运行父 Agent 明确授权的定向命令，但不运行完整测试套件。最终的 diff 审查、编译、测试、运行时检查、基准以及文档一致性验证均由 Execute 统一负责。
 
 只有 Plan 目标实现、必要验证通过且风险明确后，任务才算完成。

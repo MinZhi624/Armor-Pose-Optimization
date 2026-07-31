@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PoseRefine final (x,y) 散点分布分析脚本:
-- 搜索 target.csv → 读取 final_x_m, final_y_m
+- 搜索 log/ 下所有 *.csv → 读取 final_x_m, final_y_m
 - 按 yaw 颜色绘制散点图
 """
 
@@ -18,7 +18,7 @@ def find_target_csv(log_root):
     results = []
     for root, _dirs, files in os.walk(log_root):
         for f in files:
-            if f == "target.csv":
+            if f.endswith(".csv") and f != "index.csv":
                 rel = os.path.relpath(root, log_root)
                 parts = rel.split(os.sep)
                 n = len(parts)
@@ -39,8 +39,8 @@ def read_xy(csv_path, max_frames=0):
         for row in csv.DictReader(f):
             xs.append(float(row["final_x_m"]))
             ys.append(float(row["final_y_m"]))
-            yaws.append(float(row.get("final_yaw_rad", 0)))
-            errors.append(float(row.get("final_error_px", 0)))
+            yaws.append(float(row.get("final_pose_yaw_rad", 0)))
+            errors.append(float(row.get("final_reproj_mean_px", 0)))
             ts.append(int(row["frame_index"]))
             if 0 < max_frames <= len(xs):
                 break
@@ -112,14 +112,14 @@ def main():
     parser.add_argument("--max-frames", "-n", type=int, default=0,
                         help="Max frames to read (0=all)")
     parser.add_argument("--all", "-a", action="store_true",
-                        help="Process all target.csv automatically")
+                        help="Process all CSV files automatically")
     args = parser.parse_args()
 
     log_root = os.path.join(os.path.dirname(__file__), "log")
     targets = find_target_csv(log_root)
 
     if not targets:
-        print("No target.csv found under", log_root)
+        print("No CSV found under", log_root)
         sys.exit(1)
 
     if args.all:
@@ -132,7 +132,7 @@ def main():
     if len(targets) == 1:
         chosen = targets[0]
     else:
-        print("Found target.csv:")
+        print("Found CSV:")
         for i, (v, cm, m, _p, leg) in enumerate(targets):
             label = f"{v}/{cm}/{m}" if not leg else f"{v}/{m} (legacy)"
             print(f"  [{i}] {label}")

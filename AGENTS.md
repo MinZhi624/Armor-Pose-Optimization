@@ -54,3 +54,27 @@ Pull requests should include a brief description, affected modules, build/test r
 ## Documentation Updates
 
 Do not update project documentation by default. Delegate documentation synchronization to the `文档同步agent`; only edit documentation directly when the user explicitly requests it.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as markdown files under `.scratch/<feature>/` in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles use default label strings. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Difficulty is a routing aid, not permission to ignore risk:
+| Level | Meaning | Route |
+| --- | --- | --- |
+| D1 | Mechanical, local, and unambiguous | Build or routine Worker |
+| D2 | Conventional behavior with a clear interface | Build or routine Worker |
+| D3 | Multi-step or visibly correctness-sensitive | Planner, then Execute and expert Worker |
+| D4 | Cross-module, public interface, concurrency, or lifecycle | Planner, then Execute and expert Worker |
+| D5 | Architecture-level, high-irreversibility, or missing critical facts | Planner with Explore/Scout, then Execute |
+

@@ -23,7 +23,7 @@ armor_detector_node_cpp:
           max_angle_diff_deg: 10.0
           min_length_ratio: 0.45
           min_x_diff_ratio: 0.45
-          max_y_diff_ratio: 1.5
+          max_y_diff_ratio: 0.8
           min_distance_ratio: 0.05
           max_distance_ratio: 1.2
         light:
