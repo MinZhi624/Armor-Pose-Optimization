@@ -67,9 +67,10 @@ namespace armor_detector::debug {
             marker.pose.position.y = armor.pose.xyz_gimbal.y();
             marker.pose.position.z = armor.pose.xyz_gimbal.z();
 
-            // 姿态：yaw 来自 PnP，pitch 固定 15°，roll 固定 0
+            // 姿态：使用最终求解出的 gimbal 系 YPR
             Eigen::Quaterniond q = Eigen::AngleAxisd(armor.pose.ypr_gimbal.x(), Eigen::Vector3d::UnitZ()) *
-                Eigen::AngleAxisd(tools::ARMOR_PITCH_RAD, Eigen::Vector3d::UnitY());
+                Eigen::AngleAxisd(armor.pose.ypr_gimbal.y(), Eigen::Vector3d::UnitY()) *
+                Eigen::AngleAxisd(armor.pose.ypr_gimbal.z(), Eigen::Vector3d::UnitX());
             marker.pose.orientation.x = q.x();
             marker.pose.orientation.y = q.y();
             marker.pose.orientation.z = q.z();

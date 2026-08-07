@@ -4,8 +4,8 @@
 
 This repository contains one ROS 2 package, `armor_detector`, for RoboMaster armor plate detection.
 
-- `src/armor_detector/include/armor_detector/`: public headers, organized by component (`detector/`, `debug/`, `types/`, `tools/`, `yaw/`).
-- `src/armor_detector/src/`: C++ implementations for the node, camera provider, detector pipeline, pose solver, yaw search, and debug UI.
+- `src/armor_detector/include/armor_detector/`: public headers, organized by component (`detector/`, `debug/`, `types/`, `tools/`, `pose/`).
+- `src/armor_detector/src/`: C++ implementations for the node, camera provider, detector pipeline, pose solver, pose refinement, and debug UI.
 - `src/armor_detector/config/`: runtime YAML configuration, including camera calibration and playback settings.
 - `src/armor_detector/model/`: ONNX/IR model files (yolo, number_cnn, robot_0526).
 - `src/armor_detector/launch/`: ROS 2 launch files — `run.launch.py` (interactive, realtime playback) and `auto_test.launch.py` (headless, step playback).
@@ -50,3 +50,31 @@ Current validation is primarily rosbag playback plus ament lint. Use `auto_test.
 Recent commits use short Chinese subject lines such as `文档约定` and `框架搭建1`, without prefixes. Keep commit subjects concise, imperative or noun-phrase based, and focused on one change.
 
 Pull requests should include a brief description, affected modules, build/test results, and screenshots or terminal notes for GUI/debug behavior changes. Link related issues when available and update `docs/` when data conventions or pipeline behavior change.
+
+## Documentation Updates
+
+Do not update project documentation by default. Delegate documentation synchronization to the `文档同步agent`; only edit documentation directly when the user explicitly requests it.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as markdown files under `.scratch/<feature>/` in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles use default label strings. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Difficulty is a routing aid, not permission to ignore risk:
+| Level | Meaning | Route |
+| --- | --- | --- |
+| D1 | Mechanical, local, and unambiguous | Build or routine Worker |
+| D2 | Conventional behavior with a clear interface | Build or routine Worker |
+| D3 | Multi-step or visibly correctness-sensitive | Planner, then Execute and expert Worker |
+| D4 | Cross-module, public interface, concurrency, or lifecycle | Planner, then Execute and expert Worker |
+| D5 | Architecture-level, high-irreversibility, or missing critical facts | Planner with Explore/Scout, then Execute |
+

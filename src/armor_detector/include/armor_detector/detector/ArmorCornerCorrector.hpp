@@ -15,14 +15,24 @@ namespace armor_detector {
         debug::CornerCorrectionDebugData debug;
     };
 
-    struct CornerCorrectionParams {
+    struct ArmorGeometryCheckParams {
         bool enabled = true;
+        double max_angle_diff_deg = 30.0;
+        double min_length_ratio = 0.45;
+        double min_x_diff_ratio = 0.45;
+        double max_y_diff_ratio = 1.5;
+        double min_distance_ratio = 0.05;
+        double max_distance_ratio = 1.2;
+    };
+
+    struct CornerCorrectionParams {
         std::string method = "fit_ellipse";
         float roi_scale = 1.25f;
         int gray_threshold = 100;
         float max_endpoint_distance_px = 15.0f;
         LightBarColor target_color = LightBarColor::BLUE;
         LightGeometryParams light;
+        ArmorGeometryCheckParams geometry;
     };
 
     class ArmorCornerCorrector {
@@ -40,8 +50,10 @@ namespace armor_detector {
 
         LightBarCorrectionInput buildCorrectionInput(const LightBar &light, const cv::Mat &gray_img) const;
 
-        debug::CornerCorrectionRecord
-        correctOne(const DetectedArmor &armor, const cv::Mat &, const cv::Mat &gray_img) const;
+        debug::CornerCorrectionRecord correctOne(const DetectedArmor &armor,
+                                                 const cv::Mat &,
+                                                 const cv::Mat &gray_img,
+                                                 LightBarCorrectionMethod method) const;
     };
 
 } // namespace armor_detector

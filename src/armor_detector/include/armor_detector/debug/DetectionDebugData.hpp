@@ -1,11 +1,11 @@
 #pragma once
 
+#include "armor_detector/debug/DebugData.hpp"
 #include "armor_detector/detector/DetectionBackend.hpp"
 #include "armor_detector/types/ArmorData.hpp"
-#include "armor_detector/debug/DebugData.hpp"
 
-#include <opencv2/core.hpp>
 #include <array>
+#include <opencv2/core.hpp>
 #include <string>
 #include <vector>
 
@@ -16,6 +16,7 @@ namespace armor_detector::debug {
     struct CornerCorrectionRecord {
         std::array<cv::Point2f, 4> original_corners;
         std::array<cv::Point2f, 4> output_corners;
+        bool accepted = true;
         bool corrected = false;
         std::string method;
         std::string detail;
@@ -36,7 +37,7 @@ namespace armor_detector::debug {
     struct CornerCorrectionDebugData {
         double elapsed_ms = 0.0;
 
-        // records[i] corresponds to output_armors[i].
+        // records[i] corresponds to the input armor candidate before corner correction/filtering.
         std::vector<CornerCorrectionRecord> records;
     };
 

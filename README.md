@@ -38,7 +38,7 @@ ros2 launch armor_detector run.launch.py video:=video1
 
 Foxglove 连接 `ws://localhost:8765`，查看 `/armor_markers` topic。
 
-按键操作：`[1-6]` 切换图层，`[5]` 切换 pose marker，`[Space]` 暂停，`[n]` 单步。
+按键操作：`[1-7]` 切换图层，`[5]` 切换 pose marker，`[7]` 切换 Pose Refine 重投影角点，`[Space]` 暂停，`[n]` 单步。
 
 ### 自动测试（无头 step 模式）
 
@@ -88,7 +88,7 @@ src/armor_detector/
     detector/                # 检测后端接口和实现
     tools/                   # 坐标变换、几何常量
     types/                   # 数据结构定义
-    yaw/                     # yaw 搜索算法
+    pose/                    # 位姿求解与优化（PoseSolver、PoseRefine、PoseSearch）
   launch/
     run.launch.py            # 交互模式 launch（支持 video:= 参数切换视频）
     auto_test.launch.py      # 无头自动测试 launch
@@ -96,7 +96,7 @@ src/armor_detector/
   src/
     debug/                   # Debug observer 实现
     detector/                # 检测算法实现
-    yaw/                     # yaw 搜索实现
+    pose/                    # 位姿求解与优化实现
   Test/video/                # 测试用 rosbag 数据 (video1~video7)
 docs/                        # 设计文档和约定
 ```

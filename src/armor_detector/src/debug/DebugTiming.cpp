@@ -48,9 +48,8 @@ namespace armor_detector::debug {
         }
 
         // 帧总耗时
-        double frame_avg = (frame_window_count_ > 0)
-            ? frame_time_sum_ms_ / static_cast<double>(frame_window_count_)
-            : 0.0;
+        double frame_avg =
+            (frame_window_count_ > 0) ? frame_time_sum_ms_ / static_cast<double>(frame_window_count_) : 0.0;
 
         // 构建单行输出
         std::ostringstream ss;
@@ -61,10 +60,13 @@ namespace armor_detector::debug {
 
         bool first = true;
         for (const auto &[name, total] : stage_accum_) {
-            if (name == "detect_total") continue;
+            if (name == "detect_total")
+                continue;
             auto count_it = stage_count_.find(name);
-            if (count_it == stage_count_.end() || count_it->second == 0) continue;
-            if (!first) ss << ", ";
+            if (count_it == stage_count_.end() || count_it->second == 0)
+                continue;
+            if (!first)
+                ss << ", ";
             ss << name << ":" << (total / static_cast<double>(count_it->second)) << "ms";
             first = false;
         }
@@ -72,10 +74,22 @@ namespace armor_detector::debug {
         ss << "]";
 
         if (pose_count_ > 0) {
-            ss << ", pose:" << (pose_accum_ / static_cast<double>(pose_count_)) << "ms";
+            ss << ", pose:" << (pose_accum_ / static_cast<double>(pose_count_)) << "ms [";
+
+            bool first_pose_stage = true;
+            for (const auto &[name, total] : pose_stage_accum_) {
+                auto count_it = pose_stage_count_.find(name);
+                if (count_it == pose_stage_count_.end() || count_it->second == 0)
+                    continue;
+                if (!first_pose_stage)
+                    ss << ", ";
+                ss << name << ":" << (total / static_cast<double>(count_it->second)) << "ms";
+                first_pose_stage = false;
+            }
+
+            ss << "]";
         }
 
-        ss << "]";
         RCLCPP_INFO(rclcpp::get_logger("DebugTiming"), "%s", ss.str().c_str());
 
         // 重置
@@ -84,13 +98,20 @@ namespace armor_detector::debug {
         detection_window_count_ = 0;
         pose_accum_ = 0.0;
         pose_count_ = 0;
+        pose_stage_accum_.clear();
+        pose_stage_count_.clear();
     }
 
-    void DebugTiming::onPoseSolved(DebugFrameContext & /*context*/, const PoseDebugData & /*data*/) {
+    void DebugTiming::onPoseSolved(DebugFrameContext & /*context*/, const PoseDebugData &data) {
         auto now = std::chrono::steady_clock::now();
         double pose_ms = std::chrono::duration<double, std::milli>(now - detect_end_).count();
         pose_accum_ += pose_ms;
         ++pose_count_;
+
+        for (const auto &timing : data.timings) {
+            pose_stage_accum_[timing.name] += timing.elapsed_ms;
+            pose_stage_count_[timing.name] += 1;
+        }
     }
 
     void DebugTiming::onFrameEnd(DebugFrameContext &context) {
@@ -123,6 +144,10 @@ namespace armor_detector::debug {
         std::ostringstream total_ss;
         total_ss << std::fixed << std::setprecision(2) << last_frame_ms;
         drawText("Process: " + total_ss.str() + " ms", 1);
+
+        std::ostringstream fid_ss;
+        fid_ss << "FrameID: " << context.frame_index;
+        drawText(fid_ss.str(), 2);
     }
 
 } // namespace armor_detector::debug

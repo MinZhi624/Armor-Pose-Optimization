@@ -272,6 +272,15 @@ namespace armor_detector {
                 return correctByEllipse(input);
             case LightBarCorrectionMethod::PCA_GRADIENT:
                 return correctByPCAGradient(input);
+            case LightBarCorrectionMethod::NONE: {
+                LightBarCorrectionResult result;
+                result.raw_light = input.seed_light;
+                result.output_light = input.seed_light;
+                result.method = "none";
+                result.corrected = false;
+                result.detail = "none_method";
+                return result;
+            }
         }
         return correctByEllipse(input);
     }

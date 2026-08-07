@@ -2,15 +2,65 @@
 
 #include <opencv2/imgproc.hpp>
 
+#include <algorithm>
+
 namespace armor_detector::debug {
 
-    DebugCornerCorrectionView::DebugCornerCorrectionView(DebugGUI &gui, DebugLayerState &layer_state)
-        : gui_(&gui), layer_state_(layer_state) {
+    namespace {
+        cv::Point2f centerOf(const std::array<cv::Point2f, 4> &corners) {
+            return (corners[0] + corners[1] + corners[2] + corners[3]) * 0.25f;
+        }
+
+        void drawCornerPoints(cv::Mat &display, const std::array<cv::Point2f, 4> &corners, const cv::Scalar &color) {
+            for (const auto &corner : corners) {
+                cv::circle(display, corner, 0, color, -1);
+            }
+        }
+
+        void drawPolygon(cv::Mat &display,
+                         const std::array<cv::Point2f, 4> &corners,
+                         const cv::Scalar &color,
+                         int thickness) {
+            for (int i = 0; i < 4; ++i) {
+                cv::line(display, corners[i], corners[(i + 1) % 4], color, thickness, cv::LINE_AA);
+            }
+        }
+
+        void
+        drawLightEndpoints(cv::Mat &display, const LightBar &left, const LightBar &right, const cv::Scalar &color) {
+            cv::circle(display, left.top, 0, color, -1);
+            cv::circle(display, left.bottom, 0, color, -1);
+            cv::circle(display, right.top, 0, color, -1);
+            cv::circle(display, right.bottom, 0, color, -1);
+        }
+
+        void drawDetail(cv::Mat &display,
+                        const std::array<cv::Point2f, 4> &corners,
+                        const std::string &detail,
+                        const cv::Scalar &color) {
+            if (detail.empty()) {
+                return;
+            }
+            cv::Point2f center = centerOf(corners);
+            cv::putText(display,
+                        detail,
+                        cv::Point(static_cast<int>(center.x) - 20, static_cast<int>(center.y) + 5),
+                        cv::FONT_HERSHEY_SIMPLEX,
+                        0.35,
+                        color,
+                        1,
+                        cv::LINE_AA);
+        }
+    } // namespace
+
+    DebugCornerCorrectionView::DebugCornerCorrectionView(DebugGUI &gui, DebugLayerState &layer_state) :
+        gui_(&gui), layer_state_(layer_state) {
     }
 
-    void DebugCornerCorrectionView::onCornerCorrection(
-        DebugFrameContext &context, const CornerCorrectionDebugData &data) {
-        if (!gui_ || !gui_->enabled()) return;
+    void DebugCornerCorrectionView::onCornerCorrection(DebugFrameContext &context,
+                                                       const CornerCorrectionDebugData &data) {
+        if (!gui_ || !gui_->enabled())
+            return;
         if (!layer_state_.enabled(DebugLayer::CORNER_CORRECTION)) {
             if (was_shown_) {
                 gui_->clearFrame("corner_pca_debug");
@@ -18,41 +68,52 @@ namespace armor_detector::debug {
             }
             return;
         }
-        if (context.display_bgr.empty()) return;
+        if (context.display_bgr.empty())
+            return;
 
         was_shown_ = true;
 
         cv::Mat &display = context.display_bgr;
 
         for (const auto &record : data.records) {
-            if (record.corrected) {
-                for (int i = 0; i < 4; ++i)
-                    cv::circle(display, record.original_corners[i], 0, cv::Scalar(0, 255, 0), -1);
-                for (int i = 0; i < 4; ++i)
-                    cv::circle(display, record.output_corners[i], 0, cv::Scalar(255, 0, 255), -1);
-                for (int i = 0; i < 4; ++i)
-                    cv::line(display, record.original_corners[i], record.output_corners[i],
-                             cv::Scalar(192, 192, 192), 1, cv::LINE_AA);
+            if (!record.accepted) {
+                const auto &rejected_corners = record.corrected ? record.output_corners : record.original_corners;
+                drawCornerPoints(display, record.original_corners, cv::Scalar(0, 255, 0));
+                drawPolygon(display, rejected_corners, cv::Scalar(0, 80, 255), 1);
+                drawCornerPoints(display, rejected_corners, cv::Scalar(0, 0, 255));
                 if (record.has_raw_lights) {
-                    cv::circle(display, record.left_raw_light.top, 0, cv::Scalar(255, 255, 0), -1);
-                    cv::circle(display, record.left_raw_light.bottom, 0, cv::Scalar(255, 255, 0), -1);
-                    cv::circle(display, record.right_raw_light.top, 0, cv::Scalar(255, 255, 0), -1);
-                    cv::circle(display, record.right_raw_light.bottom, 0, cv::Scalar(255, 255, 0), -1);
+                    drawLightEndpoints(display, record.left_raw_light, record.right_raw_light, cv::Scalar(255, 255, 0));
                 }
                 if (record.has_output_lights) {
-                    cv::circle(display, record.left_output_light.top, 0, cv::Scalar(255, 0, 128), -1);
-                    cv::circle(display, record.left_output_light.bottom, 0, cv::Scalar(255, 0, 128), -1);
-                    cv::circle(display, record.right_output_light.top, 0, cv::Scalar(255, 0, 128), -1);
-                    cv::circle(display, record.right_output_light.bottom, 0, cv::Scalar(255, 0, 128), -1);
+                    drawLightEndpoints(
+                        display, record.left_output_light, record.right_output_light, cv::Scalar(255, 0, 128));
                 }
-            } else {
+                drawDetail(display, rejected_corners, record.detail, cv::Scalar(0, 80, 255));
+                continue;
+            }
+
+            if (record.corrected) {
+                drawCornerPoints(display, record.original_corners, cv::Scalar(0, 255, 0));
+                drawCornerPoints(display, record.output_corners, cv::Scalar(255, 0, 255));
                 for (int i = 0; i < 4; ++i)
-                    cv::circle(display, record.original_corners[i], 0, cv::Scalar(0, 255, 0), -1);
-                cv::Point2f center = (record.original_corners[0] + record.original_corners[1] +
-                                      record.original_corners[2] + record.original_corners[3]) * 0.25f;
-                cv::putText(display, record.detail,
-                            cv::Point(static_cast<int>(center.x) - 20, static_cast<int>(center.y) + 5),
-                            cv::FONT_HERSHEY_SIMPLEX, 0.35, cv::Scalar(128, 128, 128), 1, cv::LINE_AA);
+                    cv::line(display,
+                             record.original_corners[i],
+                             record.output_corners[i],
+                             cv::Scalar(192, 192, 192),
+                             1,
+                             cv::LINE_AA);
+                if (record.has_raw_lights) {
+                    drawLightEndpoints(display, record.left_raw_light, record.right_raw_light, cv::Scalar(255, 255, 0));
+                }
+                if (record.has_output_lights) {
+                    drawLightEndpoints(
+                        display, record.left_output_light, record.right_output_light, cv::Scalar(255, 0, 128));
+                }
+            }
+            else {
+                drawCornerPoints(display, record.original_corners, cv::Scalar(0, 255, 0));
+                drawPolygon(display, record.original_corners, cv::Scalar(128, 128, 128), 1);
+                drawDetail(display, record.original_corners, record.detail, cv::Scalar(128, 128, 128));
             }
         }
 
@@ -76,12 +137,10 @@ namespace armor_detector::debug {
                 row1_right = cv::Mat::zeros(record.right_pca_viz.size(), CV_8UC3);
 
             // Row 2: PCA viz (left | right)
-            cv::Mat row2_left = record.left_pca_viz.empty()
-                                    ? cv::Mat::zeros(record.left_gray_roi.size(), CV_8UC3)
-                                    : record.left_pca_viz;
-            cv::Mat row2_right = record.right_pca_viz.empty()
-                                     ? cv::Mat::zeros(record.right_gray_roi.size(), CV_8UC3)
-                                     : record.right_pca_viz;
+            cv::Mat row2_left = record.left_pca_viz.empty() ? cv::Mat::zeros(record.left_gray_roi.size(), CV_8UC3)
+                                                            : record.left_pca_viz;
+            cv::Mat row2_right = record.right_pca_viz.empty() ? cv::Mat::zeros(record.right_gray_roi.size(), CV_8UC3)
+                                                              : record.right_pca_viz;
 
             // Pad left/right in each row to same height
             auto padPair = [](cv::Mat &a, cv::Mat &b) {

@@ -48,6 +48,10 @@ namespace armor_detector::debug {
             action = DebugKeyAction::TOGGLE_LAYER;
             layer = DebugLayer::CORNER_CORRECTION;
         }
+        else if (raw_key == '7') {
+            action = DebugKeyAction::TOGGLE_LAYER;
+            layer = DebugLayer::POSE_REFINE;
+        }
         else if (raw_key == '0') {
             action = DebugKeyAction::TOGGLE_LAYER;
             layer = DebugLayer::RESULT;
