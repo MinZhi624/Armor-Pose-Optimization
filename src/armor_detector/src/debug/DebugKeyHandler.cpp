@@ -26,25 +26,33 @@ namespace armor_detector::debug {
         }
         else if (raw_key == '1') {
             action = DebugKeyAction::TOGGLE_LAYER;
-            layer = DebugLayer::PREPROCESS;
+            layer = DebugLayer::DETECT_STAGE_1;
         }
         else if (raw_key == '2') {
             action = DebugKeyAction::TOGGLE_LAYER;
-            layer = DebugLayer::LIGHTS;
+            layer = DebugLayer::DETECT_STAGE_2;
         }
         else if (raw_key == '3') {
             action = DebugKeyAction::TOGGLE_LAYER;
-            layer = DebugLayer::ARMOR_MATCH;
+            layer = DebugLayer::DETECT_STAGE_3;
         }
         else if (raw_key == '4') {
             action = DebugKeyAction::TOGGLE_LAYER;
-            layer = DebugLayer::CLASSIFICATION;
+            layer = DebugLayer::DETECT_STAGE_4;
         }
         else if (raw_key == '5') {
             action = DebugKeyAction::TOGGLE_LAYER;
             layer = DebugLayer::POSE;
         }
         else if (raw_key == '6') {
+            action = DebugKeyAction::TOGGLE_LAYER;
+            layer = DebugLayer::CORNER_CORRECTION;
+        }
+        else if (raw_key == '7') {
+            action = DebugKeyAction::TOGGLE_LAYER;
+            layer = DebugLayer::POSE_REFINE;
+        }
+        else if (raw_key == '0') {
             action = DebugKeyAction::TOGGLE_LAYER;
             layer = DebugLayer::RESULT;
         }

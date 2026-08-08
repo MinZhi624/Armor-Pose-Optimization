@@ -8,21 +8,17 @@ namespace armor_detector::debug {
         gui_(&gui), layer_state_(layer_state) {
     }
 
-    void DebugLightView::onLights(DebugFrameContext &context, const LightDebugData &data) {
-        if (!gui_ || !gui_->enabled()) {
-            return;
-        }
-        if (!layer_state_.enabled(DebugLayer::LIGHTS)) {
-            return;
-        }
-        if (context.display_bgr.empty()) {
-            return;
-        }
+    void DebugLightView::onDetection(DebugFrameContext &context, const DetectionDebugData &data) {
+        if (data.backend != DetectionBackend::TRADITIONAL) return;
+        if (!gui_ || !gui_->enabled()) return;
+        if (!layer_state_.enabled(DebugLayer::DETECT_STAGE_2)) return;
+        if (context.display_bgr.empty()) return;
 
+        const auto &lights = data.traditional.lights;
         cv::Mat &display = context.display_bgr;
 
         // 绘制 accepted lights：绿色 rotatedRect + 端点
-        for (const auto &light : data.accepted_lights) {
+        for (const auto &light : lights.accepted_lights) {
             cv::Point2f vertices[4];
             light.rect.points(vertices);
             for (int i = 0; i < 4; i++) {
@@ -33,7 +29,7 @@ namespace armor_detector::debug {
         }
 
         // 绘制 rejected lights：红色 + 原因
-        for (const auto &rejected : data.rejected_lights) {
+        for (const auto &rejected : lights.rejected_lights) {
             cv::Point2f vertices[4];
             rejected.light.rect.points(vertices);
             for (int i = 0; i < 4; i++) {

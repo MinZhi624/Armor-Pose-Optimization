@@ -52,23 +52,19 @@ CATKIN_IGNORE
 install/
 log/
 Camera/
-# 个人配置文件 
+### 个人配置文件 ### 
 .vscode
 .clangd
-pthoto/
-picture/
-Daily.md
 .cache/
 temp/
-docs/superpowers/
+tmp/
+### Debug日志 ###
+debug/pose_refine/log/
 # 视屏 
 *.avi
 *.mp4
 *.mkv
-# 串口通信协议
-通信协议/
-# 神经网络
-Debug/NumberROI/
-# ros bag
-tmp/
+### ros bag ###
 *.db3
+
+teach/

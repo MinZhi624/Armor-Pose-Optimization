@@ -8,13 +8,14 @@ namespace armor_detector::debug {
         gui_(&gui), layer_state_(layer_state) {
     }
 
-    void DebugPreprocessView::onPreprocess(DebugFrameContext &context, const PreprocessDebugData &data) {
-        if (!gui_ || !gui_->enabled()) {
-            return;
-        }
+    void DebugPreprocessView::onDetection(DebugFrameContext &context, const DetectionDebugData &data) {
+        if (data.backend != DetectionBackend::TRADITIONAL) return;
+        if (!gui_ || !gui_->enabled()) return;
+
+        const auto &preprocess = data.traditional.preprocess;
 
         // 图层关闭：清理旧窗口后返回
-        if (!layer_state_.enabled(DebugLayer::PREPROCESS)) {
+        if (!layer_state_.enabled(DebugLayer::DETECT_STAGE_1)) {
             if (was_shown_) {
                 gui_->clearFrame("preprocess_debug");
                 was_shown_ = false;
@@ -43,9 +44,9 @@ namespace armor_detector::debug {
             return half;
         };
 
-        cv::Mat gray_half = toHalfBgr(data.gray);
-        cv::Mat binary_half = toHalfBgr(data.img_thre);
-        cv::Mat color_half = toHalfBgr(data.color_mask);
+        cv::Mat gray_half = toHalfBgr(preprocess.gray);
+        cv::Mat binary_half = toHalfBgr(preprocess.img_thre);
+        cv::Mat color_half = toHalfBgr(preprocess.color_mask);
 
         // 空图用黑图替代，保证 2x2 网格尺寸一致
         cv::Mat black = cv::Mat::zeros(src_half.size(), CV_8UC3);

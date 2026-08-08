@@ -1,4 +1,5 @@
 #include "armor_detector/detector/ArmorDetector.hpp"
+#include "armor_detector/tools/angle.hpp"
 
 #include <algorithm>
 #include <cmath>

@@ -8,13 +8,15 @@
 
 namespace armor_detector {
 
+    struct LightGeometryParams {
+        int min_contours_area = 30;
+        float min_contours_ratio = 0.06f;
+        float max_contours_ratio = 0.5f;
+    };
+
     class LightDetector {
     public:
-        struct Params {
-            int min_contours_area = 30;
-            float min_contours_ratio = 0.06f;
-            float max_contours_ratio = 0.5f;
-        };
+        using Params = LightGeometryParams;
 
         explicit LightDetector(const Params &params);
 
@@ -24,16 +26,16 @@ namespace armor_detector {
             return light_debug_;
         }
 
+        static bool checkLightGeometry(const std::vector<cv::Point> &contour,
+                                       const LightGeometryParams &params);
+
+        static LightBar createLightBar(const std::vector<cv::Point> &contour);
+
+        static LightBarColor findLightColor(const cv::Mat &img_bgr,
+                                            const cv::RotatedRect &rect,
+                                            const std::vector<cv::Point> &contour);
+
     private:
-        bool checkLightGeometry(const std::vector<cv::Point> &contour) const;
-
-        LightBarColor findLightColor(const cv::Mat &img_bgr,
-                                     const cv::RotatedRect &rect,
-                                     const std::vector<cv::Point> &contour) const;
-
-        LightBar
-        createLight(const cv::RotatedRect &ellipse_rect, const cv::RotatedRect &min_rect, LightBarColor color) const;
-
         Params params_;
         debug::LightDebugData light_debug_;
     };

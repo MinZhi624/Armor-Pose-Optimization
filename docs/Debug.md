@@ -1,190 +1,91 @@
 # Debug 扩展规范
 
-本文档只记录 `armor_detector` 包内 debug 功能的扩展方式和代码规范。单位、坐标系、角点顺序、`cv::Mat` 生命周期等全局硬约定见 `Conventions.md`。
+本文档按 `Core-Ball-Vision` 当前实现记录 debug 模块的扩展边界。它不是 ROS2、检测后端或算法阶段的规范；当前工程只有桌面截图、帧处理和 OpenCV 调试显示。
 
 ## 总体原则
 
-- 主流程只负责算法顺序，不直接写窗口显示、ROI 保存、耗时统计等 debug 细节。
-- Debug 功能通过 `IDebugObserver` 扩展，由 `DebugHub` 统一注册和分发事件。
-- 所有 OpenCV 窗口、`imshow`、`waitKey`、`destroyAllWindows` 只能放在 `DebugGUI` 或其实现中。
-- Observer 只读主流程数据，不反向修改算法结果。
-- 新增 debug 功能优先新增一个 `DebugXXX` Observer，不要把功能塞回 `DetectorNode` 主流程。
-- Debug 数据中的单位、坐标和 `cv::Mat` 生命周期必须遵守 `Conventions.md`。
+- `src/main.cpp` 负责帧消费、状态切换和事件分发，不直接调用 `cv::imshow`、`cv::waitKey` 或窗口销毁 API。
+- Debug 功能通过 `IDebugObserver` 扩展，由 `DebugHub` 统一分发帧事件和按键事件。
+- 所有 OpenCV HighGUI 调用只能放在 `DebugGUI` 的 GUI 线程中。
+- Observer 应把原始图像 `DebugFrameContext::source_bgr` 视为只读；需要叠加可视化时修改 `display_bgr`。
+- 新增独立的统计、绘制或日志功能时，优先新增 `DebugXXX` Observer，不要把实现塞入主循环。
 
-## 文件命名
-
-Debug 相关文件放在：
+## 当前数据流
 
 ```text
-include/armor_detector/debug/
-src/debug/
+WindowCapture 生产线程
+    -> ThreadSafeQueue<type::Frame>（容量 1，仅保留最新帧）
+    -> main 消费帧
+    -> DebugFrameContext{source_bgr, display_bgr}
+    -> DebugHub::onFrameStart()
+    -> DebugHub::onFrameEnd()
+    -> DebugGUI::setFrame("RESULT", display_bgr, 0.5)
+    -> DebugGUI GUI 线程显示
 ```
 
-当前已有文件：
+`source_bgr` 与采集帧共享 OpenCV 图像数据；`display_bgr` 在主循环中由 `frame.image.clone()` 创建，供 Observer 绘制。`DebugGUI::setFrame()` 会再次 clone，因此 GUI 线程不依赖下一帧的图像生命周期。
+
+## 代码位置
 
 ```text
-DebugData.hpp                   阶段 debug 数据结构
-IDebugObserver.hpp              Observer 接口
-DebugHub.hpp                    事件分发器
-DebugGUI.hpp                    GUI 统一出口
-DebugKeyHandler.hpp             按键转换
-DebugLayerState.hpp             图层开关状态（线程安全）
-DebugLayerController.hpp        数字键切换图层
-DebugTiming.hpp                 耗时统计（无头模式也打印日志）
-DebugPoseMarkerPublisher.hpp    /armor_markers MarkerArray 发布
-DebugPreprocess.hpp             预处理图层
-DebugLight.hpp                  灯条图层
-DebugArmorMatch.hpp             装甲板匹配图层
-DebugClassification.hpp         数字分类图层
-DebugPose.hpp                   位姿/坐标图层
-DebugResult.hpp                 最终结果图层
-DebugRoiRecorder.hpp            ROI 录制
+include/debug/DebugData.hpp        帧上下文、图层和按键事件类型
+include/debug/IDebugObserver.hpp   Observer 默认空实现接口
+include/debug/DebugHub.hpp         Observer 注册和同步分发
+include/debug/DebugGUI.hpp         GUI 线程与帧/按键队列接口
+include/debug/DebugKeyHandler.hpp  原始按键转换
+include/debug/DebugTiming.hpp      帧处理耗时统计
+src/debug/                          DebugGUI、按键和 Timing 实现
 ```
 
-新增功能使用 `Debug + 功能名`，例如：
+## 事件与数据
+
+当前 `IDebugObserver` 只定义以下阶段级事件：
 
 ```text
-DebugPnpError.hpp
-DebugRejectedArmor.hpp
+onFrameStart(DebugFrameContext&)   主循环取得新帧后、处理开始前
+onFrameEnd(DebugFrameContext&)     当前帧处理完成后、提交 RESULT 前
+onKey(DebugKeyEvent const&)        主循环从 GUI 取到并翻译按键后
 ```
 
-## 新增 Observer 的步骤
+不要在像素循环或每个候选目标的内层循环中增加事件分发。若后续算法确实需要新的阶段事件，应先在 `DebugData.hpp` 定义清楚事件输入，再为接口和 `DebugHub` 同步增加该事件。
 
-1. 判断这个功能关心哪个阶段事件。
-2. 若现有事件数据不够，在 `DebugData.hpp` 中补充对应阶段的数据结构。
-3. 新增 `DebugXXX` 类，继承 `IDebugObserver`。
-4. 只重写自己关心的事件，其他事件保持默认空实现。
-5. 如果需要显示图像，把图像提交给 `DebugGUI`，不要直接调用 `cv::imshow`。
-6. 如果需要发布 ROS topic（如 MarkerArray），在构造时创建 publisher。
-7. 如果需要响应按键，实现 `onKey(const DebugKeyEvent & event)`。
-8. 在 `DetectorNode::initDebug()` 中注册到 `DebugHub`。
+`DebugFrameContext` 当前字段如下：
 
-## Observer 分类
+| 字段 | 含义 |
+|---|---|
+| `frame_index` | 已消费帧的递增编号 |
+| `timestamp` | 生产线程完成截图和像素转换后的 `steady_clock` 时间戳 |
+| `source_bgr` | 原始 BGR 图像，只读输入 |
+| `display_bgr` | 可绘制的 BGR 显示副本 |
 
-### 非 GUI Observer（始终注册）
+## 新增 Observer
 
-不受 `debug.show` 控制，即使无头模式也工作：
+1. 在 `include/debug/` 和 `src/debug/` 新增 `DebugXXX`。
+2. 继承 `IDebugObserver`，只重写所需事件。
+3. 绘图时修改 `context.display_bgr`；需要独立窗口时通过 `DebugGUI::setFrame()` 提交，不能自行调用 HighGUI。
+4. 在 `src/main.cpp` 创建 `DebugHub` 后注册 Observer。
+5. 若新增窗口名、叠加文字或图形语义，同步更新 `DebugGUI.md`。
 
-- **DebugTiming** — 阶段耗时统计，每 `debug.stats_interval` 帧打印平均用时日志
-- **DebugPoseMarkerPublisher** — `/armor_markers` MarkerArray 发布，受 `debug.pose` 图层控制
+当前唯一 Observer 是 `DebugTiming(50)`：
 
-### GUI Observer（仅 debug.show=true 时注册）
+- `onFrameStart` 记录当前帧开始时间；若时间戳未设置则补为当前时间。
+- `onFrameEnd` 计算处理耗时，在 `display_bgr` 左上绘制耗时，并每 50 帧输出平均耗时和 FPS 日志。
 
-需要 OpenCV 窗口，无头模式下不注册：
+## 按键与主循环状态
 
-- DebugPreprocessView, DebugLightView, DebugArmorMatchView
-- DebugClassificationView, DebugResultView
-- DebugLayerController（数字键切换）
+GUI 线程只采集原始按键；`DebugKeyHandler` 将其转为 `DebugKeyEvent`，主线程再处理并调用 `DebugHub::onKey()`。
 
-注册逻辑：
-
-```cpp
-void DetectorNode::initDebug() {
-    // 非 GUI observer：始终注册
-    debug_hub_.addObserver(std::make_shared<debug::DebugTiming>(debug_config_.stats_interval));
-    debug_hub_.addObserver(std::make_shared<debug::DebugPoseMarkerPublisher>(*this, layer_state_));
-
-    // GUI observer：仅 debug.show=true 时注册
-    if (!debug_config_.show) return;
-    // ... 注册 GUI observers
-}
-```
-
-## 事件使用规范
-
-当前保留这些阶段事件：
-
-```text
-onFrameStart
-onPreprocess
-onLights
-onArmorMatch
-onClassification
-onPoseSolved
-onFrameEnd
-onKey
-```
-
-事件粒度保持"阶段级"，不要在像素循环、轮廓循环等高频内层逻辑里发事件。
-
-## 开关规范
-
-Debug 开关控制 Observer 是否注册，而不是在主流程中堆 `if debug_xxx`。
-
-配置结构：
-
-```yaml
-debug:
-  show: true            # OpenCV GUI 开关（非 GUI observer 不受此控制）
-  rosbag_control: true
-  rosbag_player_node: "/rosbag2_player"
-  preprocess: false
-  lights: true
-  armor_match: false
-  classification: false
-  pose: false           # 控制 /armor_markers 发布
-  result: true
-  stats_interval: 50    # 耗时统计打印间隔（帧数）
-
-playback:
-  mode: "realtime"      # "realtime" 或 "step"
-  max_frames: 0         # 0=不限制，>0 时处理指定帧数后退出
-  exit_on_complete: false
-```
-
-## 按键规范
-
-`cv::waitKey` 的原始值由 `DebugKeyHandler` 转换为 `DebugKeyEvent`。
-
-当前保留动作：
-
-```text
-EXIT          退出节点 / 关闭窗口
-PAUSE_TOGGLE  rosbag 暂停/继续
-STEP_FRAME    rosbag 单步
-SAVE_ROI      保存 ROI（预留）
-TOGGLE_LAYER  切换图层显示（数字键 1-6）
-```
-
-## 图层切换
-
-数字键 1–6 切换对应 debug 图层的显示状态：
-
-| 按键 | 图层 | 说明 |
+| 原始按键 | 动作 | 主循环行为 |
 |---|---|---|
-| 1 | preprocess | 预处理中间图 |
-| 2 | lights | 灯条检测结果 |
-| 3 | armor_match | 装甲板匹配 |
-| 4 | classification | 数字分类 |
-| 5 | pose | /armor_markers 发布开关 |
-| 6 | result | 最终识别装甲板 X 标记 |
+| `Esc`、`q`、`Q` | `EXIT` | 结束主循环 |
+| Space、`p`、`P` | `PAUSE_TOGGLE` | 暂停或恢复帧消费、debug 处理和显示更新 |
+| `0` | `TOGGLE_LAYER(RESULT)` | 切换 RESULT 窗口；关闭时清除窗口 |
 
-切换后输出日志，例如：`DEBUG layer lights: ON`
+暂停不停止 `WindowCapture` 生产线程。队列只保存一帧，恢复后处理的是最新桌面画面；暂停循环仍轮询按键，因此 `Q` 必须保持可用。
 
-## Timing 行为
+## 线程边界
 
-- `timing` 不是图层——始终注册，无法通过数字键关闭。
-- 无论 `debug.show` 是否启用，每 `debug.stats_interval` 帧都打印平均耗时日志。
-- 仅当 `debug.show=true` 且 `display_bgr` 非空时，才在 GUI 上绘制 `Process: ... ms`。
-- `auto_test.launch.py` 支持 `timing_interval` 参数覆盖 `debug.stats_interval`。
-
-## 播放控制
-
-### realtime 模式
-
-- rosbag 按时间正常播放
-- 按键 Space 暂停/继续，n 单步
-
-### step 模式
-
-- 处理完一帧后再请求播放下一帧
-- 通过 `/rosbag2_player/play_next` service 控制
-- 使用 in-flight 状态机避免请求竞争
-- `auto_test.launch.py` 默认使用此模式
-
-## 数据结构规范
-
-- 阶段 debug 数据统一放在 `DebugData.hpp`。
-- 数据结构只表达"该阶段产生了什么"，不要混入窗口布局细节。
-- 拒绝原因使用枚举 `DebugRejectReason`，补充细节放到 `detail` 字符串。
-- 如果字段会影响算法结果，它不应该放在 debug 数据里。
+- `DebugHub` 和 Observer 回调只由主线程调用；不要让 GUI 线程调用 Observer。
+- `DebugGUI` 自己持有一个线程，负责窗口显示、`waitKeyEx(1)` 和 `destroyAllWindows()`。
+- `WindowCapture` 的 X11 截图由独立生产线程完成。不要在 debug 代码中直接访问其 X11 资源。
+- 程序退出时先 `debug_gui.stop()`，再 `capture.close()`，避免 GUI 或抓取线程遗留运行状态。
